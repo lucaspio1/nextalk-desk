@@ -15,7 +15,11 @@ import { ChatWindow } from '../views/partials/ChatWindow';
 
 export default function AppController() {
   const authModel = useAuthModel();
-  const ticketModel = useTicketsModel(authModel.user);
+  
+  // CORREÇÃO AQUI: Usamos authModel.profile em vez de authModel.user
+  // Isto garante que o sistema de tickets inicie assim que fazemos o login "demo",
+  // sem esperar pela conexão real do Firebase (que não existe).
+  const ticketModel = useTicketsModel(authModel.profile);
 
   const [view, setView] = useState('chat');
   const [adminTab, setAdminTab] = useState('connection');
@@ -37,6 +41,7 @@ export default function AppController() {
   };
 
   const handleCreateTicket = async ({ name, phone, message }) => {
+    // Cria o ticket usando o serviço (agora em modo Mock/Demo)
     const docRef = await TicketService.createTicket({
       customerName: name,
       customerPhone: phone,
@@ -46,6 +51,7 @@ export default function AppController() {
       aiCategory: 'Outros',
       aiPriority: 'Normal'
     });
+    // Seleciona o ticket recém-criado para abrir a janela de chat imediatamente
     setSelectedTicketId(docRef.id);
   };
 

@@ -129,16 +129,13 @@ export const ChatWindow = ({ ticket, currentUser, onSend, onClose, onPick, onTra
         )}
       </div>
       
-      {/* RIGHT SIDEBAR */}
+      {/* RIGHT SIDEBAR - ATUALIZADO */}
       <div className="w-80 bg-white border-l border-gray-200 hidden xl:flex flex-col h-full shrink-0 overflow-y-auto">
          <div className="p-6 border-b border-gray-100 flex items-center gap-3">
             <div className="w-12 h-12 bg-gray-200 rounded-full flex items-center justify-center text-gray-500 font-bold text-lg">{currentUser.name.charAt(0)}</div>
             <div><h3 className="font-bold text-gray-800">{currentUser.name}</h3><span className="text-xs text-gray-500 uppercase font-medium">{currentUser.role === 'manager' ? 'Admin' : 'Agente'}</span></div>
          </div>
-         <div className="p-6 space-y-6">
-            <div><label className="text-xs font-bold text-gray-400 uppercase mb-2 block">Código da instância</label><div className="flex gap-2"><div className="flex-1 bg-gray-50 border border-gray-200 rounded p-2 text-xs text-gray-600 truncate font-mono">chatpro-f5ecb82dd2</div></div></div>
-            <div className="pt-4 space-y-3 border-t border-gray-100"><button className="w-full bg-emerald-500 hover:bg-emerald-600 text-white py-2.5 rounded-lg text-sm font-medium transition-colors">Suporte via chatPro</button></div>
-         </div>
+         {/* Seção removida aqui */}
       </div>
     </div>
   );

@@ -1,5 +1,4 @@
 import { useState, useEffect, useMemo } from 'react';
-import { onSnapshot } from 'firebase/firestore';
 import { TicketService } from '../services/TicketService';
 
 export const useTicketsModel = (user) => {
@@ -7,11 +6,19 @@ export const useTicketsModel = (user) => {
 
   useEffect(() => {
     if (!user) return;
-    const unsubscribe = onSnapshot(TicketService.collectionRef, (snapshot) => {
-      const docs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      docs.sort((a, b) => (b.createdAt?.toMillis() || 0) - (a.createdAt?.toMillis() || 0));
+    
+    // Usa o listener unificado (suporta tanto Firebase Real quanto Mock Local)
+    const unsubscribe = TicketService.listenToTickets((docs) => {
+      // Ordenação corrigida: datas nulas (pendentes) são tratadas como 'agora' 
+      // para garantir que novos tickets fiquem no topo da lista
+      docs.sort((a, b) => {
+        const dateA = a.createdAt?.toMillis?.() || Date.now();
+        const dateB = b.createdAt?.toMillis?.() || Date.now();
+        return dateB - dateA;
+      });
       setTickets(docs);
     });
+
     return () => unsubscribe();
   }, [user]);
 
@@ -22,13 +29,18 @@ export const useTicketsModel = (user) => {
 
     let totalWait = 0, totalHandle = 0;
     closed.forEach(t => {
-      if(t.startedAt && t.createdAt) totalWait += (t.startedAt.seconds - t.createdAt.seconds);
-      if(t.closedAt && t.startedAt) totalHandle += (t.closedAt.seconds - t.startedAt.seconds);
+      // Verifica existência das propriedades antes de calcular
+      const startSeconds = t.startedAt?.seconds || 0;
+      const createdSeconds = t.createdAt?.seconds || 0;
+      const closedSeconds = t.closedAt?.seconds || 0;
+
+      if(startSeconds && createdSeconds) totalWait += (startSeconds - createdSeconds);
+      if(closedSeconds && startSeconds) totalHandle += (closedSeconds - startSeconds);
     });
 
     const byAgent = {};
     const agentActive = {};
-    byAgent['Lucas Pio'] = 0;
+    byAgent['Lucas Pio'] = 0; // Inicializa padrão para garantir presença no gráfico
 
     [...closed, ...active].forEach(t => {
       const agent = t.agentId || 'Desconhecido';
@@ -56,7 +68,11 @@ export const useTicketsModel = (user) => {
       avgWait: closed.length ? totalWait / closed.length : 0,
       avgHandle: closed.length ? totalHandle / closed.length : 0,
       agentsOnline: 1,
-      chartDataAgent: Object.keys(byAgent).map(k => ({ name: k, finalizados: byAgent[k], emAtendimento: agentActive[k] || 0 })),
+      chartDataAgent: Object.keys(byAgent).map(k => ({ 
+        name: k, 
+        finalizados: byAgent[k], 
+        emAtendimento: agentActive[k] || 0 
+      })),
       chartDataDept: departments,
       chartReasons: reasons
     };

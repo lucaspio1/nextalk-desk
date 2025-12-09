@@ -22,11 +22,9 @@ const AdminSidebar = ({ activeTab, onTabChange }) => {
 
   return (
     <div className="w-64 bg-[#f8f9fa] border-r border-gray-200 flex flex-col h-full overflow-y-auto shrink-0">
+      {/* Card do chatPro REMOVIDO aqui */}
       <div className="p-4">
-        <div className="bg-gray-100 rounded-lg p-3 text-sm text-gray-600 mb-4 border border-gray-200">
-          <div className="flex items-center gap-2 mb-1 font-bold"><MessageSquare size={14}/> chatPro</div>
-          Conecte o chatPro à sua conta do WhatsApp, Facebook ou Instagram.
-        </div>
+         {/* Espaço vazio ou outro conteúdo futuro */}
       </div>
       <nav className="flex-1 px-2 space-y-0.5">
         {items.map(item => (
@@ -44,7 +42,9 @@ const AdminSidebar = ({ activeTab, onTabChange }) => {
   );
 };
 
+// ... Restante do código AdminContent permanece igual ...
 const AdminContent = ({ activeTab }) => {
+    // ... (mesmo conteúdo anterior)
     const [status, setStatus] = useState('DISCONNECTED');
     const [isLoading, setIsLoading] = useState(false);
 
@@ -800,7 +800,7 @@ const AdminContent = ({ activeTab }) => {
                <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
                  <div className="bg-white rounded-lg shadow-xl w-full max-w-md">
                    <div className="px-4 py-3 border-b border-gray-100 flex justify-between items-center">
-                     <h3 className="font-bold text-gray-700">{editingTag ? 'Editar' : 'Nova'} Etiqueta</h3>
+                     <h3 className="font-bold text-gray-700">{editingTag ? 'Editar' : 'Novo'} Etiqueta</h3>
                      <button onClick={() => setShowTagModal(false)} className="text-gray-400 hover:text-gray-600"><X size={18} /></button>
                    </div>
                    <div className="p-4 space-y-3">
