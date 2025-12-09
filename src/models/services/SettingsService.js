@@ -198,5 +198,158 @@ export const SettingsService = {
       console.error('Error deleting user:', error);
       return false;
     }
+  },
+
+  // Contacts
+  async getContacts() {
+    try {
+      const colRef = getCollectionRef('contacts');
+      const snapshot = await getDocs(colRef);
+      return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    } catch (error) {
+      console.error('Error fetching contacts:', error);
+      return [];
+    }
+  },
+
+  async createContact(data) {
+    try {
+      const colRef = getCollectionRef('contacts');
+      const docRef = await addDoc(colRef, {
+        ...data,
+        createdAt: serverTimestamp()
+      });
+      return docRef.id;
+    } catch (error) {
+      console.error('Error creating contact:', error);
+      return null;
+    }
+  },
+
+  async updateContact(id, data) {
+    try {
+      const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'contacts', id);
+      await updateDoc(docRef, {
+        ...data,
+        updatedAt: serverTimestamp()
+      });
+      return true;
+    } catch (error) {
+      console.error('Error updating contact:', error);
+      return false;
+    }
+  },
+
+  async deleteContact(id) {
+    try {
+      const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'contacts', id);
+      await deleteDoc(docRef);
+      return true;
+    } catch (error) {
+      console.error('Error deleting contact:', error);
+      return false;
+    }
+  },
+
+  // Tags
+  async getTags() {
+    try {
+      const colRef = getCollectionRef('tags');
+      const snapshot = await getDocs(colRef);
+      return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    } catch (error) {
+      console.error('Error fetching tags:', error);
+      return [];
+    }
+  },
+
+  async createTag(data) {
+    try {
+      const colRef = getCollectionRef('tags');
+      const docRef = await addDoc(colRef, {
+        ...data,
+        createdAt: serverTimestamp()
+      });
+      return docRef.id;
+    } catch (error) {
+      console.error('Error creating tag:', error);
+      return null;
+    }
+  },
+
+  async updateTag(id, data) {
+    try {
+      const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'tags', id);
+      await updateDoc(docRef, {
+        ...data,
+        updatedAt: serverTimestamp()
+      });
+      return true;
+    } catch (error) {
+      console.error('Error updating tag:', error);
+      return false;
+    }
+  },
+
+  async deleteTag(id) {
+    try {
+      const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'tags', id);
+      await deleteDoc(docRef);
+      return true;
+    } catch (error) {
+      console.error('Error deleting tag:', error);
+      return false;
+    }
+  },
+
+  // Closing Reasons
+  async getReasons() {
+    try {
+      const colRef = getCollectionRef('reasons');
+      const snapshot = await getDocs(colRef);
+      return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    } catch (error) {
+      console.error('Error fetching reasons:', error);
+      return [];
+    }
+  },
+
+  async createReason(data) {
+    try {
+      const colRef = getCollectionRef('reasons');
+      const docRef = await addDoc(colRef, {
+        ...data,
+        createdAt: serverTimestamp()
+      });
+      return docRef.id;
+    } catch (error) {
+      console.error('Error creating reason:', error);
+      return null;
+    }
+  },
+
+  async updateReason(id, data) {
+    try {
+      const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'reasons', id);
+      await updateDoc(docRef, {
+        ...data,
+        updatedAt: serverTimestamp()
+      });
+      return true;
+    } catch (error) {
+      console.error('Error updating reason:', error);
+      return false;
+    }
+  },
+
+  async deleteReason(id) {
+    try {
+      const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'reasons', id);
+      await deleteDoc(docRef);
+      return true;
+    } catch (error) {
+      console.error('Error deleting reason:', error);
+      return false;
+    }
   }
 };

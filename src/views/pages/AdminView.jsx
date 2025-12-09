@@ -14,11 +14,8 @@ const AdminSidebar = ({ activeTab, onTabChange }) => {
     { id: 'contacts', icon: CheckSquare, label: 'Contatos' },
     { id: 'tags', icon: Tag, label: 'Etiquetas' },
     { id: 'reasons', icon: CheckCircle, label: 'Motivos de Finalização' },
-    { id: 'schedule', icon: Clock, label: 'Jornada de Trabalho' },
     { id: 'chatbot', icon: Bot, label: 'Chatbot' },
     { id: 'ai', icon: Brain, label: 'Inteligência Artificial' },
-    { id: 'widgets', icon: LayoutGrid, label: 'Widgets' },
-    { id: 'dev', icon: Code, label: 'Desenvolvedor' },
     { id: 'payment', icon: CreditCard, label: 'Pagamento' },
     { id: 'profile', icon: UserCog, label: 'Meus dados' },
   ];
@@ -80,6 +77,27 @@ const AdminContent = ({ activeTab }) => {
     const [userForm, setUserForm] = useState({ name: '', email: '', role: 'agent' });
     const [userSearch, setUserSearch] = useState('');
 
+    // Contatos
+    const [contacts, setContacts] = useState([]);
+    const [showContactModal, setShowContactModal] = useState(false);
+    const [editingContact, setEditingContact] = useState(null);
+    const [contactForm, setContactForm] = useState({ name: '', phone: '', email: '', notes: '' });
+    const [contactSearch, setContactSearch] = useState('');
+
+    // Etiquetas
+    const [tags, setTags] = useState([]);
+    const [showTagModal, setShowTagModal] = useState(false);
+    const [editingTag, setEditingTag] = useState(null);
+    const [tagForm, setTagForm] = useState({ name: '', color: '#10b981' });
+    const [tagSearch, setTagSearch] = useState('');
+
+    // Motivos de Finalização
+    const [reasons, setReasons] = useState([]);
+    const [showReasonModal, setShowReasonModal] = useState(false);
+    const [editingReason, setEditingReason] = useState(null);
+    const [reasonForm, setReasonForm] = useState({ name: '', description: '' });
+    const [reasonSearch, setReasonSearch] = useState('');
+
     // Load data on mount
     useEffect(() => {
         if (activeTab === 'connection') {
@@ -92,6 +110,12 @@ const AdminContent = ({ activeTab }) => {
             loadDepartments();
         } else if (activeTab === 'users') {
             loadUsers();
+        } else if (activeTab === 'contacts') {
+            loadContacts();
+        } else if (activeTab === 'tags') {
+            loadTags();
+        } else if (activeTab === 'reasons') {
+            loadReasons();
         }
     }, [activeTab]);
 
@@ -200,6 +224,99 @@ const AdminContent = ({ activeTab }) => {
         setShowUserModal(true);
     };
 
+    // Contatos Functions
+    const loadContacts = async () => {
+        const contactsList = await SettingsService.getContacts();
+        setContacts(contactsList);
+    };
+
+    const saveContact = async () => {
+        if (editingContact) {
+            await SettingsService.updateContact(editingContact.id, contactForm);
+        } else {
+            await SettingsService.createContact(contactForm);
+        }
+        setShowContactModal(false);
+        setContactForm({ name: '', phone: '', email: '', notes: '' });
+        setEditingContact(null);
+        loadContacts();
+    };
+
+    const deleteContact = async (id) => {
+        if (confirm('Tem certeza que deseja excluir este contato?')) {
+            await SettingsService.deleteContact(id);
+            loadContacts();
+        }
+    };
+
+    const editContact = (contact) => {
+        setEditingContact(contact);
+        setContactForm({ name: contact.name, phone: contact.phone, email: contact.email, notes: contact.notes });
+        setShowContactModal(true);
+    };
+
+    // Etiquetas Functions
+    const loadTags = async () => {
+        const tagsList = await SettingsService.getTags();
+        setTags(tagsList);
+    };
+
+    const saveTag = async () => {
+        if (editingTag) {
+            await SettingsService.updateTag(editingTag.id, tagForm);
+        } else {
+            await SettingsService.createTag(tagForm);
+        }
+        setShowTagModal(false);
+        setTagForm({ name: '', color: '#10b981' });
+        setEditingTag(null);
+        loadTags();
+    };
+
+    const deleteTag = async (id) => {
+        if (confirm('Tem certeza que deseja excluir esta etiqueta?')) {
+            await SettingsService.deleteTag(id);
+            loadTags();
+        }
+    };
+
+    const editTag = (tag) => {
+        setEditingTag(tag);
+        setTagForm({ name: tag.name, color: tag.color });
+        setShowTagModal(true);
+    };
+
+    // Motivos de Finalização Functions
+    const loadReasons = async () => {
+        const reasonsList = await SettingsService.getReasons();
+        setReasons(reasonsList);
+    };
+
+    const saveReason = async () => {
+        if (editingReason) {
+            await SettingsService.updateReason(editingReason.id, reasonForm);
+        } else {
+            await SettingsService.createReason(reasonForm);
+        }
+        setShowReasonModal(false);
+        setReasonForm({ name: '', description: '' });
+        setEditingReason(null);
+        loadReasons();
+    };
+
+    const deleteReason = async (id) => {
+        if (confirm('Tem certeza que deseja excluir este motivo de finalização?')) {
+            await SettingsService.deleteReason(id);
+            loadReasons();
+        }
+    };
+
+    const editReason = (reason) => {
+        setEditingReason(reason);
+        setReasonForm({ name: reason.name, description: reason.description });
+        setShowReasonModal(true);
+    };
+
     const handleConnect = async () => {
         setIsLoading(true);
         try {
@@ -225,6 +342,20 @@ const AdminContent = ({ activeTab }) => {
     const filteredUsers = users.filter(u =>
         u.name?.toLowerCase().includes(userSearch.toLowerCase()) ||
         u.email?.toLowerCase().includes(userSearch.toLowerCase())
+    );
+
+    const filteredContacts = contacts.filter(c =>
+        c.name?.toLowerCase().includes(contactSearch.toLowerCase()) ||
+        c.phone?.toLowerCase().includes(contactSearch.toLowerCase()) ||
+        c.email?.toLowerCase().includes(contactSearch.toLowerCase())
+    );
+
+    const filteredTags = tags.filter(t =>
+        t.name?.toLowerCase().includes(tagSearch.toLowerCase())
+    );
+
+    const filteredReasons = reasons.filter(r =>
+        r.name?.toLowerCase().includes(reasonSearch.toLowerCase())
     );
 
     switch(activeTab) {
@@ -538,6 +669,235 @@ const AdminContent = ({ activeTab }) => {
                      </div>
                      <div className="pt-2">
                        <Button onClick={saveUser} className="w-full bg-emerald-600 text-white">
+                         <Save size={16} className="mr-2" /> Salvar
+                       </Button>
+                     </div>
+                   </div>
+                 </div>
+               </div>
+             )}
+          </div>
+        );
+
+      case 'contacts':
+        return (
+          <div className="max-w-5xl space-y-4 animate-in fade-in slide-in-from-bottom-2 duration-500">
+             <SectionHeader
+               title="Contatos"
+               description="Gerencie os contatos do sistema."
+               action={<Button variant="primary" className="bg-emerald-500" onClick={() => { setEditingContact(null); setContactForm({ name: '', phone: '', email: '', notes: '' }); setShowContactModal(true); }}><PlusCircle size={16}/> Adicionar</Button>}
+             />
+             <div className="bg-white p-4 rounded-lg border border-gray-100 flex gap-2 mb-4">
+               <input
+                 type="text"
+                 placeholder="Pesquisar..."
+                 value={contactSearch}
+                 onChange={(e) => setContactSearch(e.target.value)}
+                 className="flex-1 bg-transparent outline-none text-sm"
+               />
+             </div>
+             <AdminTable
+               headers={['Nome', 'Telefone', 'Email', 'Ação']}
+               rows={filteredContacts.map(c => [
+                 c.name,
+                 c.phone,
+                 c.email || '-',
+                 <div className="flex gap-2">
+                   <button onClick={() => editContact(c)} className="text-emerald-600 hover:text-emerald-700"><Edit2 size={14}/></button>
+                   <button onClick={() => deleteContact(c.id)} className="text-red-600 hover:text-red-700"><Trash2 size={14}/></button>
+                 </div>
+               ])}
+             />
+
+             {showContactModal && (
+               <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+                 <div className="bg-white rounded-lg shadow-xl w-full max-w-md">
+                   <div className="px-4 py-3 border-b border-gray-100 flex justify-between items-center">
+                     <h3 className="font-bold text-gray-700">{editingContact ? 'Editar' : 'Novo'} Contato</h3>
+                     <button onClick={() => setShowContactModal(false)} className="text-gray-400 hover:text-gray-600"><X size={18} /></button>
+                   </div>
+                   <div className="p-4 space-y-3">
+                     <div>
+                       <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Nome</label>
+                       <input
+                         className="w-full p-2 border border-gray-200 rounded text-sm"
+                         value={contactForm.name}
+                         onChange={(e) => setContactForm({...contactForm, name: e.target.value})}
+                       />
+                     </div>
+                     <div>
+                       <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Telefone</label>
+                       <input
+                         className="w-full p-2 border border-gray-200 rounded text-sm"
+                         value={contactForm.phone}
+                         onChange={(e) => setContactForm({...contactForm, phone: e.target.value})}
+                         placeholder="5511999999999"
+                       />
+                     </div>
+                     <div>
+                       <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Email</label>
+                       <input
+                         type="email"
+                         className="w-full p-2 border border-gray-200 rounded text-sm"
+                         value={contactForm.email}
+                         onChange={(e) => setContactForm({...contactForm, email: e.target.value})}
+                       />
+                     </div>
+                     <div>
+                       <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Notas</label>
+                       <textarea
+                         className="w-full p-2 border border-gray-200 rounded text-sm resize-none"
+                         rows="3"
+                         value={contactForm.notes}
+                         onChange={(e) => setContactForm({...contactForm, notes: e.target.value})}
+                       />
+                     </div>
+                     <div className="pt-2">
+                       <Button onClick={saveContact} className="w-full bg-emerald-600 text-white">
+                         <Save size={16} className="mr-2" /> Salvar
+                       </Button>
+                     </div>
+                   </div>
+                 </div>
+               </div>
+             )}
+          </div>
+        );
+
+      case 'tags':
+        return (
+          <div className="max-w-5xl space-y-4 animate-in fade-in slide-in-from-bottom-2 duration-500">
+             <SectionHeader
+               title="Etiquetas"
+               description="Organize e categorize tickets com etiquetas personalizadas."
+               action={<Button variant="primary" className="bg-emerald-500" onClick={() => { setEditingTag(null); setTagForm({ name: '', color: '#10b981' }); setShowTagModal(true); }}><PlusCircle size={16}/> Adicionar</Button>}
+             />
+             <div className="bg-white p-4 rounded-lg border border-gray-100 flex gap-2 mb-4">
+               <input
+                 type="text"
+                 placeholder="Pesquisar..."
+                 value={tagSearch}
+                 onChange={(e) => setTagSearch(e.target.value)}
+                 className="flex-1 bg-transparent outline-none text-sm"
+               />
+             </div>
+             <AdminTable
+               headers={['Nome', 'Cor', 'Ação']}
+               rows={filteredTags.map(t => [
+                 <div className="flex items-center gap-2">
+                   <div className="w-4 h-4 rounded" style={{ backgroundColor: t.color }}></div>
+                   {t.name}
+                 </div>,
+                 t.color,
+                 <div className="flex gap-2">
+                   <button onClick={() => editTag(t)} className="text-emerald-600 hover:text-emerald-700"><Edit2 size={14}/></button>
+                   <button onClick={() => deleteTag(t.id)} className="text-red-600 hover:text-red-700"><Trash2 size={14}/></button>
+                 </div>
+               ])}
+             />
+
+             {showTagModal && (
+               <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+                 <div className="bg-white rounded-lg shadow-xl w-full max-w-md">
+                   <div className="px-4 py-3 border-b border-gray-100 flex justify-between items-center">
+                     <h3 className="font-bold text-gray-700">{editingTag ? 'Editar' : 'Nova'} Etiqueta</h3>
+                     <button onClick={() => setShowTagModal(false)} className="text-gray-400 hover:text-gray-600"><X size={18} /></button>
+                   </div>
+                   <div className="p-4 space-y-3">
+                     <div>
+                       <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Nome</label>
+                       <input
+                         className="w-full p-2 border border-gray-200 rounded text-sm"
+                         value={tagForm.name}
+                         onChange={(e) => setTagForm({...tagForm, name: e.target.value})}
+                       />
+                     </div>
+                     <div>
+                       <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Cor</label>
+                       <div className="flex gap-2 items-center">
+                         <input
+                           type="color"
+                           className="w-12 h-10 border border-gray-200 rounded cursor-pointer"
+                           value={tagForm.color}
+                           onChange={(e) => setTagForm({...tagForm, color: e.target.value})}
+                         />
+                         <input
+                           type="text"
+                           className="flex-1 p-2 border border-gray-200 rounded text-sm"
+                           value={tagForm.color}
+                           onChange={(e) => setTagForm({...tagForm, color: e.target.value})}
+                           placeholder="#10b981"
+                         />
+                       </div>
+                     </div>
+                     <div className="pt-2">
+                       <Button onClick={saveTag} className="w-full bg-emerald-600 text-white">
+                         <Save size={16} className="mr-2" /> Salvar
+                       </Button>
+                     </div>
+                   </div>
+                 </div>
+               </div>
+             )}
+          </div>
+        );
+
+      case 'reasons':
+        return (
+          <div className="max-w-5xl space-y-4 animate-in fade-in slide-in-from-bottom-2 duration-500">
+             <SectionHeader
+               title="Motivos de Finalização"
+               description="Defina motivos para o encerramento de tickets."
+               action={<Button variant="primary" className="bg-emerald-500" onClick={() => { setEditingReason(null); setReasonForm({ name: '', description: '' }); setShowReasonModal(true); }}><PlusCircle size={16}/> Adicionar</Button>}
+             />
+             <div className="bg-white p-4 rounded-lg border border-gray-100 flex gap-2 mb-4">
+               <input
+                 type="text"
+                 placeholder="Pesquisar..."
+                 value={reasonSearch}
+                 onChange={(e) => setReasonSearch(e.target.value)}
+                 className="flex-1 bg-transparent outline-none text-sm"
+               />
+             </div>
+             <AdminTable
+               headers={['Título', 'Descrição', 'Ação']}
+               rows={filteredReasons.map(r => [
+                 r.name,
+                 r.description || '-',
+                 <div className="flex gap-2">
+                   <button onClick={() => editReason(r)} className="text-emerald-600 hover:text-emerald-700"><Edit2 size={14}/></button>
+                   <button onClick={() => deleteReason(r.id)} className="text-red-600 hover:text-red-700"><Trash2 size={14}/></button>
+                 </div>
+               ])}
+             />
+
+             {showReasonModal && (
+               <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+                 <div className="bg-white rounded-lg shadow-xl w-full max-w-md">
+                   <div className="px-4 py-3 border-b border-gray-100 flex justify-between items-center">
+                     <h3 className="font-bold text-gray-700">{editingReason ? 'Editar' : 'Novo'} Motivo de Finalização</h3>
+                     <button onClick={() => setShowReasonModal(false)} className="text-gray-400 hover:text-gray-600"><X size={18} /></button>
+                   </div>
+                   <div className="p-4 space-y-3">
+                     <div>
+                       <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Nome</label>
+                       <input
+                         className="w-full p-2 border border-gray-200 rounded text-sm"
+                         value={reasonForm.name}
+                         onChange={(e) => setReasonForm({...reasonForm, name: e.target.value})}
+                       />
+                     </div>
+                     <div>
+                       <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Descrição</label>
+                       <textarea
+                         className="w-full p-2 border border-gray-200 rounded text-sm resize-none"
+                         rows="3"
+                         value={reasonForm.description}
+                         onChange={(e) => setReasonForm({...reasonForm, description: e.target.value})}
+                       />
+                     </div>
+                     <div className="pt-2">
+                       <Button onClick={saveReason} className="w-full bg-emerald-600 text-white">
                          <Save size={16} className="mr-2" /> Salvar
                        </Button>
                      </div>
