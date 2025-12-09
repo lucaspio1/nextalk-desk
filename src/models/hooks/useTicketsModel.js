@@ -17,7 +17,7 @@ export const useTicketsModel = (user) => {
 
   const stats = useMemo(() => {
     const closed = tickets.filter(t => t.status === 'closed');
-    const open = tickets.filter(t => t.status === 'open' || t.status === 'analyzing');
+    const open = tickets.filter(t => t.status === 'open');
     const active = tickets.filter(t => t.status === 'active');
     
     let totalWait = 0, totalHandle = 0;
