@@ -1,35 +1,63 @@
 import { useState, useEffect, useMemo } from 'react';
-import { onSnapshot } from 'firebase/firestore';
 import { TicketService } from '../services/TicketService';
 
 export const useTicketsModel = (user) => {
   const [tickets, setTickets] = useState([]);
-  
+
   useEffect(() => {
     if (!user) return;
-    const unsubscribe = onSnapshot(TicketService.collectionRef, (snapshot) => {
-      const docs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      docs.sort((a, b) => (b.createdAt?.toMillis() || 0) - (a.createdAt?.toMillis() || 0));
+
+    // Função para carregar tickets do localStorage
+    const loadTickets = () => {
+      const docs = TicketService.getTickets();
+      // Ordena por data de criação (mais recentes primeiro)
+      docs.sort((a, b) => {
+        const dateA = new Date(a.createdAt).getTime();
+        const dateB = new Date(b.createdAt).getTime();
+        return dateB - dateA;
+      });
       setTickets(docs);
-    });
-    return () => unsubscribe();
+    };
+
+    // Carrega tickets inicialmente
+    loadTickets();
+
+    // Escuta mudanças nos tickets
+    const handleTicketsUpdate = () => {
+      loadTickets();
+    };
+
+    window.addEventListener('ticketsUpdated', handleTicketsUpdate);
+
+    // Cleanup
+    return () => {
+      window.removeEventListener('ticketsUpdated', handleTicketsUpdate);
+    };
   }, [user]);
 
   const stats = useMemo(() => {
     const closed = tickets.filter(t => t.status === 'closed');
     const open = tickets.filter(t => t.status === 'open');
     const active = tickets.filter(t => t.status === 'active');
-    
+
     let totalWait = 0, totalHandle = 0;
     closed.forEach(t => {
-      if(t.startedAt && t.createdAt) totalWait += (t.startedAt.seconds - t.createdAt.seconds);
-      if(t.closedAt && t.startedAt) totalHandle += (t.closedAt.seconds - t.startedAt.seconds);
+      if (t.startedAt && t.createdAt) {
+        const startedDate = new Date(t.startedAt).getTime();
+        const createdDate = new Date(t.createdAt).getTime();
+        totalWait += (startedDate - createdDate) / 1000; // em segundos
+      }
+      if (t.closedAt && t.startedAt) {
+        const closedDate = new Date(t.closedAt).getTime();
+        const startedDate = new Date(t.startedAt).getTime();
+        totalHandle += (closedDate - startedDate) / 1000; // em segundos
+      }
     });
 
     const byAgent = {};
     const agentActive = {};
     byAgent['Lucas Pio'] = 0;
-    
+
     [...closed, ...active].forEach(t => {
       const agent = t.agentId || 'Desconhecido';
       byAgent[agent] = (byAgent[agent] || 0) + 1;
@@ -55,7 +83,7 @@ export const useTicketsModel = (user) => {
       finalized: closed.length,
       avgWait: closed.length ? totalWait / closed.length : 0,
       avgHandle: closed.length ? totalHandle / closed.length : 0,
-      agentsOnline: 1, 
+      agentsOnline: 1,
       chartDataAgent: Object.keys(byAgent).map(k => ({ name: k, finalizados: byAgent[k], emAtendimento: agentActive[k] || 0 })),
       chartDataDept: departments,
       chartReasons: reasons

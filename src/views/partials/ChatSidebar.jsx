@@ -53,12 +53,16 @@ export const ChatSidebar = ({ tickets, currentUser, selectedId, onSelect, onCrea
     }
   };
 
-  const TicketItem = ({ t }) => (
-    <div onClick={() => onSelect(t)} className={`p-4 border-b border-gray-100 cursor-pointer hover:bg-gray-50 transition-colors ${selectedId === t.id ? 'bg-emerald-50 border-l-4 border-l-emerald-500' : ''}`}>
-      <div className="flex justify-between mb-1">
-        <span className={`font-semibold truncate ${t.status === 'closed' ? 'text-gray-500' : 'text-gray-900'}`}>{t.customerName}</span>
-        <span className="text-xs text-gray-400">{new Date(t.createdAt?.toMillis()).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}</span>
-      </div>
+  const TicketItem = ({ t }) => {
+    // Trata formato de data do localStorage (ISO string) ou Firebase (timestamp)
+    const createdDate = t.createdAt?.toMillis ? new Date(t.createdAt.toMillis()) : new Date(t.createdAt);
+
+    return (
+      <div onClick={() => onSelect(t)} className={`p-4 border-b border-gray-100 cursor-pointer hover:bg-gray-50 transition-colors ${selectedId === t.id ? 'bg-emerald-50 border-l-4 border-l-emerald-500' : ''}`}>
+        <div className="flex justify-between mb-1">
+          <span className={`font-semibold truncate ${t.status === 'closed' ? 'text-gray-500' : 'text-gray-900'}`}>{t.customerName}</span>
+          <span className="text-xs text-gray-400">{createdDate.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}</span>
+        </div>
       <div className="text-sm text-gray-500 truncate mb-2">{t.messages[t.messages.length-1]?.text}</div>
       <div className="flex gap-1 flex-wrap items-center">
         {t.status === 'open' && <span className="w-2 h-2 rounded-full bg-amber-400 mr-1" title="Aguardando"></span>}
@@ -71,7 +75,8 @@ export const ChatSidebar = ({ tickets, currentUser, selectedId, onSelect, onCrea
         )}
       </div>
     </div>
-  );
+    );
+  };
 
   return (
     <div className="w-full md:w-80 bg-white border-r border-gray-200 flex flex-col h-full shrink-0 z-10 relative">

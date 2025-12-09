@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import { MessageSquare, BarChart2, LogOut, Settings } from 'lucide-react';
-import { serverTimestamp } from 'firebase/firestore';
 
 import { useAuthModel } from '../models/hooks/useAuthModel';
 import { useTicketsModel } from '../models/hooks/useTicketsModel';
@@ -49,23 +48,15 @@ export default function AppController() {
         timestamp: Date.now()
       }] : [];
 
-      // Add timeout to prevent infinite hanging
-      const createWithTimeout = Promise.race([
-        TicketService.createTicket({
-          customerName: name,
-          customerPhone: phone,
-          status: 'active',
-          agentId: authModel.profile.name,
-          messages: initialMessages,
-          aiCategory: 'Outros',
-          aiPriority: 'Normal'
-        }),
-        new Promise((_, reject) =>
-          setTimeout(() => reject(new Error('Timeout: Firebase não respondeu em 10 segundos. Verifique sua conexão e configuração do Firebase.')), 10000)
-        )
-      ]);
-
-      const docRef = await createWithTimeout;
+      const docRef = await TicketService.createTicket({
+        customerName: name,
+        customerPhone: phone,
+        status: 'active',
+        agentId: authModel.profile.name,
+        messages: initialMessages,
+        aiCategory: 'Outros',
+        aiPriority: 'Normal'
+      });
 
       console.log('[handleCreateTicket] Ticket criado com ID:', docRef.id);
 
@@ -169,8 +160,8 @@ export default function AppController() {
               onSend={(txt) => TicketService.sendMessage(selectedTicket.id, selectedTicket.messages, { text: txt, sender: 'agent', agentName: authModel.profile.name }, selectedTicket.customerPhone)}
               onTransfer={handleTransfer}
               onReopen={handleReopen}
-              onClose={() => { TicketService.updateTicket(selectedTicket.id, { status: 'closed', closedAt: serverTimestamp() }); setSelectedTicketId(null); }}
-              onPick={() => TicketService.updateTicket(selectedTicket.id, { status: 'active', agentId: authModel.profile.name, startedAt: serverTimestamp() })}
+              onClose={() => { TicketService.updateTicket(selectedTicket.id, { status: 'closed', closedAt: new Date().toISOString() }); setSelectedTicketId(null); }}
+              onPick={() => TicketService.updateTicket(selectedTicket.id, { status: 'active', agentId: authModel.profile.name, startedAt: new Date().toISOString() })}
               aiActions={{
                 onSmartReply: handleSmartReply,
                 onSummarize: handleSummarize,
