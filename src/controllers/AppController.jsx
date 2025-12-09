@@ -22,7 +22,7 @@ export default function AppController() {
   const [selectedTicketId, setSelectedTicketId] = useState(null);
   const [loginError, setLoginError] = useState("");
   const [isLoggingIn, setIsLoggingIn] = useState(false);
-  const [aiState, setAiState] = useState({ replyLoading: false, summaryLoading: false, summaryData: null, triageLoading: false });
+  const [aiState, setAiState] = useState({ replyLoading: false, summaryLoading: false, summaryData: null });
 
   const handleLogin = async (email, pass) => {
     setIsLoggingIn(true);
@@ -49,25 +49,6 @@ export default function AppController() {
     setSelectedTicketId(docRef.id);
   };
 
-  const handleSimulateCustomer = async () => {
-    setAiState(p => ({...p, triageLoading: true}));
-    const scenarios = [
-      { t: "Bom dia, o boleto da minha instalação venceu ontem.", n: "Solar Tech" },
-      { t: "Quanto custa o plano enterprise para 10 agentes?", n: "João Silva" },
-      { t: "Meu sistema caiu, erro 500 no login.", n: "Ana Dev" }
-    ];
-    const s = scenarios[Math.floor(Math.random() * scenarios.length)];
-    const docRef = await TicketService.createTicket({
-      customerName: s.n, status: 'analyzing', agentId: null,
-      messages: [{ text: s.t, sender: 'customer' }],
-      aiCategory: '...', aiPriority: '...'
-    });
-    const analysis = await AIService.triageTicket(s.t);
-    await TicketService.updateTicket(docRef.id, {
-      status: 'open', aiCategory: analysis.category, aiPriority: analysis.priority, aiSummary: analysis.summary
-    });
-    setAiState(p => ({...p, triageLoading: false}));
-  };
 
   const handleSmartReply = async (ticket, setInputFn) => {
     setAiState(p => ({...p, replyLoading: true}));
@@ -145,9 +126,7 @@ export default function AppController() {
               currentUser={authModel.profile}
               selectedId={selectedTicketId}
               onSelect={(t) => { if (t.status !== 'analyzing') { setSelectedTicketId(t.id); setAiState(p => ({...p, summaryData: null})); }}}
-              onSimulate={handleSimulateCustomer}
               onCreateTicket={handleCreateTicket}
-              isSimulating={aiState.triageLoading}
             />
             <ChatWindow 
               ticket={selectedTicket}
