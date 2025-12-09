@@ -1,11 +1,11 @@
 import React, { useState } from 'react';
 import { MessageSquare, BarChart2, LogOut, Settings } from 'lucide-react';
+import { serverTimestamp } from 'firebase/firestore';
 
 import { useAuthModel } from '../models/hooks/useAuthModel';
 import { useTicketsModel } from '../models/hooks/useTicketsModel';
 import { AIService } from '../models/services/AIService';
 import { TicketService } from '../models/services/TicketService';
-import { WhatsAppService } from '../models/services/WhatsAppService';
 
 import { LoginView } from '../views/pages/LoginView';
 import { DashboardView } from '../views/pages/DashboardView';
@@ -22,7 +22,7 @@ export default function AppController() {
   const [selectedTicketId, setSelectedTicketId] = useState(null);
   const [loginError, setLoginError] = useState("");
   const [isLoggingIn, setIsLoggingIn] = useState(false);
-  const [aiState, setAiState] = useState({ replyLoading: false, summaryLoading: false, summaryData: null });
+  const [aiState, setAiState] = useState({ replyLoading: false, summaryLoading: false, summaryData: null, triageLoading: false });
 
   const handleLogin = async (email, pass) => {
     setIsLoggingIn(true);
@@ -37,52 +37,36 @@ export default function AppController() {
   };
 
   const handleCreateTicket = async ({ name, phone, message }) => {
-    try {
-      console.log('[handleCreateTicket] Criando novo ticket:', { name, phone, message });
+    const docRef = await TicketService.createTicket({
+      customerName: name,
+      customerPhone: phone,
+      status: 'active',
+      agentId: authModel.profile.name,
+      messages: message.trim() ? [{ text: message, sender: 'agent', agentName: authModel.profile.name }] : [],
+      aiCategory: 'Outros',
+      aiPriority: 'Normal'
+    });
+    setSelectedTicketId(docRef.id);
+  };
 
-      // Create ticket with initial message if provided
-      const initialMessages = message.trim() ? [{
-        text: message,
-        sender: 'agent',
-        agentName: authModel.profile.name,
-        timestamp: Date.now()
-      }] : [];
-
-      const docRef = await TicketService.createTicket({
-        customerName: name,
-        customerPhone: phone,
-        status: 'active',
-        agentId: authModel.profile.name,
-        messages: initialMessages,
-        aiCategory: 'Outros',
-        aiPriority: 'Normal'
-      });
-
-      console.log('[handleCreateTicket] Ticket criado com ID:', docRef.id);
-
-      // If message provided, also send via WhatsApp
-      if (message.trim()) {
-        const cleanPhone = phone.replace(/\D/g, '');
-        console.log('[handleCreateTicket] Enviando mensagem via WhatsApp para:', cleanPhone);
-        await WhatsAppService.sendMessage(cleanPhone, message);
-      }
-
-      // Select the new ticket
-      console.log('[handleCreateTicket] Selecionando ticket:', docRef.id);
-
-      // Força reload da lista de tickets
-      console.log('[handleCreateTicket] Forçando reload da lista de tickets...');
-      window.dispatchEvent(new CustomEvent('ticketsUpdated'));
-
-      // Aguarda um pouco para garantir que a lista foi atualizada antes de selecionar
-      setTimeout(() => {
-        setSelectedTicketId(docRef.id);
-        console.log('[handleCreateTicket] Ticket selecionado');
-      }, 200);
-    } catch (error) {
-      console.error('[handleCreateTicket] Erro ao criar ticket:', error);
-      alert('Erro ao criar conversa: ' + error.message);
-    }
+  const handleSimulateCustomer = async () => {
+    setAiState(p => ({...p, triageLoading: true}));
+    const scenarios = [
+      { t: "Bom dia, o boleto da minha instalação venceu ontem.", n: "Solar Tech" },
+      { t: "Quanto custa o plano enterprise para 10 agentes?", n: "João Silva" },
+      { t: "Meu sistema caiu, erro 500 no login.", n: "Ana Dev" }
+    ];
+    const s = scenarios[Math.floor(Math.random() * scenarios.length)];
+    const docRef = await TicketService.createTicket({
+      customerName: s.n, status: 'analyzing', agentId: null,
+      messages: [{ text: s.t, sender: 'customer' }],
+      aiCategory: '...', aiPriority: '...'
+    });
+    const analysis = await AIService.triageTicket(s.t);
+    await TicketService.updateTicket(docRef.id, {
+      status: 'open', aiCategory: analysis.category, aiPriority: analysis.priority, aiSummary: analysis.summary
+    });
+    setAiState(p => ({...p, triageLoading: false}));
   };
 
   const handleSmartReply = async (ticket, setInputFn) => {
@@ -160,17 +144,19 @@ export default function AppController() {
               tickets={ticketModel.tickets}
               currentUser={authModel.profile}
               selectedId={selectedTicketId}
-              onSelect={(t) => { setSelectedTicketId(t.id); setAiState(p => ({...p, summaryData: null})); }}
+              onSelect={(t) => { if (t.status !== 'analyzing') { setSelectedTicketId(t.id); setAiState(p => ({...p, summaryData: null})); }}}
+              onSimulate={handleSimulateCustomer}
               onCreateTicket={handleCreateTicket}
+              isSimulating={aiState.triageLoading}
             />
             <ChatWindow 
               ticket={selectedTicket}
               currentUser={authModel.profile}
-              onSend={(txt) => TicketService.sendMessage(selectedTicket.id, selectedTicket.messages, { text: txt, sender: 'agent', agentName: authModel.profile.name }, selectedTicket.customerPhone)}
+              onSend={(txt) => TicketService.sendMessage(selectedTicket.id, selectedTicket.messages, { text: txt, sender: 'agent', agentName: authModel.profile.name })}
               onTransfer={handleTransfer}
               onReopen={handleReopen}
-              onClose={() => { TicketService.updateTicket(selectedTicket.id, { status: 'closed', closedAt: new Date().toISOString() }); setSelectedTicketId(null); }}
-              onPick={() => TicketService.updateTicket(selectedTicket.id, { status: 'active', agentId: authModel.profile.name, startedAt: new Date().toISOString() })}
+              onClose={() => { TicketService.updateTicket(selectedTicket.id, { status: 'closed', closedAt: serverTimestamp() }); setSelectedTicketId(null); }}
+              onPick={() => TicketService.updateTicket(selectedTicket.id, { status: 'active', agentId: authModel.profile.name, startedAt: serverTimestamp() })}
               aiActions={{
                 onSmartReply: handleSmartReply,
                 onSummarize: handleSummarize,

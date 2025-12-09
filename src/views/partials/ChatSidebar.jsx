@@ -1,18 +1,17 @@
 import React, { useState, useMemo } from 'react';
-import { PlusCircle, Search, CheckCircle, User, X } from 'lucide-react';
+import { PlusCircle, Search, CheckCircle, User, X, Loader2, Sparkles } from 'lucide-react';
 import { Badge } from '../components/UIComponents';
 
-export const ChatSidebar = ({ tickets, currentUser, selectedId, onSelect, onCreateTicket }) => {
+export const ChatSidebar = ({ tickets, currentUser, selectedId, onSelect, onSimulate, isSimulating, onCreateTicket }) => {
   const [activeFilter, setActiveFilter] = useState('mine');
   const [showNewChat, setShowNewChat] = useState(false);
   const [newChatData, setNewChatData] = useState({ name: '', phone: '', message: '' });
-  const [isCreating, setIsCreating] = useState(false);
 
   // Contagem
   const counts = useMemo(() => {
     return tickets.reduce((acc, t) => {
       acc.all++;
-      if (t.status === 'open') acc.waiting++;
+      if (t.status === 'open' || t.status === 'analyzing') acc.waiting++;
       if (t.status === 'active') acc.active++;
       if (t.status === 'active' && t.agentId === currentUser?.name) acc.mine++;
       return acc;
@@ -29,7 +28,7 @@ export const ChatSidebar = ({ tickets, currentUser, selectedId, onSelect, onCrea
   const filteredTickets = useMemo(() => {
     return tickets.filter(t => {
       switch(activeFilter) {
-        case 'waiting': return t.status === 'open';
+        case 'waiting': return t.status === 'open' || t.status === 'analyzing';
         case 'active': return t.status === 'active';
         case 'mine': return t.status === 'active' && t.agentId === currentUser?.name;
         case 'all': default: return true;
@@ -37,32 +36,23 @@ export const ChatSidebar = ({ tickets, currentUser, selectedId, onSelect, onCrea
     });
   }, [tickets, activeFilter, currentUser]);
 
-  const handleCreate = async (e) => {
+  const handleCreate = (e) => {
     e.preventDefault();
-    console.log('[ChatSidebar] Iniciando criação de ticket:', newChatData);
-    setIsCreating(true);
-    try {
-      await onCreateTicket(newChatData);
-      console.log('[ChatSidebar] Ticket criado com sucesso');
-      setShowNewChat(false);
-      setNewChatData({ name: '', phone: '', message: '' });
-    } catch (error) {
-      console.error('[ChatSidebar] Erro ao criar ticket:', error);
-    } finally {
-      setIsCreating(false);
-    }
+    onCreateTicket(newChatData);
+    setShowNewChat(false);
+    setNewChatData({ name: '', phone: '', message: '' });
   };
 
-  const TicketItem = ({ t }) => {
-    // Trata formato de data do localStorage (ISO string) ou Firebase (timestamp)
-    const createdDate = t.createdAt?.toMillis ? new Date(t.createdAt.toMillis()) : new Date(t.createdAt);
-
-    return (
-      <div onClick={() => onSelect(t)} className={`p-4 border-b border-gray-100 cursor-pointer hover:bg-gray-50 transition-colors ${selectedId === t.id ? 'bg-emerald-50 border-l-4 border-l-emerald-500' : ''}`}>
-        <div className="flex justify-between mb-1">
-          <span className={`font-semibold truncate ${t.status === 'closed' ? 'text-gray-500' : 'text-gray-900'}`}>{t.customerName}</span>
-          <span className="text-xs text-gray-400">{createdDate.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}</span>
-        </div>
+  const TicketItem = ({ t }) => (
+    <div onClick={() => onSelect(t)} className={`p-4 border-b border-gray-100 cursor-pointer hover:bg-gray-50 transition-colors ${selectedId === t.id ? 'bg-emerald-50 border-l-4 border-l-emerald-500' : ''} ${t.status === 'analyzing' ? 'opacity-70 pointer-events-none' : ''}`}>
+      <div className="flex justify-between mb-1">
+        <span className={`font-semibold truncate ${t.status === 'closed' ? 'text-gray-500' : 'text-gray-900'}`}>{t.customerName}</span>
+        {t.status === 'analyzing' ? (
+          <span className="text-xs text-indigo-600 flex items-center gap-1"><Loader2 size={10} className="animate-spin"/> IA...</span>
+        ) : (
+          <span className="text-xs text-gray-400">{new Date(t.createdAt?.toMillis()).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}</span>
+        )}
+      </div>
       <div className="text-sm text-gray-500 truncate mb-2">{t.messages[t.messages.length-1]?.text}</div>
       <div className="flex gap-1 flex-wrap items-center">
         {t.status === 'open' && <span className="w-2 h-2 rounded-full bg-amber-400 mr-1" title="Aguardando"></span>}
@@ -75,8 +65,7 @@ export const ChatSidebar = ({ tickets, currentUser, selectedId, onSelect, onCrea
         )}
       </div>
     </div>
-    );
-  };
+  );
 
   return (
     <div className="w-full md:w-80 bg-white border-r border-gray-200 flex flex-col h-full shrink-0 z-10 relative">
@@ -102,9 +91,7 @@ export const ChatSidebar = ({ tickets, currentUser, selectedId, onSelect, onCrea
                     <textarea className="w-full p-2 border border-gray-200 rounded text-sm focus:ring-2 focus:ring-emerald-500 outline-none resize-none" rows="3" value={newChatData.message} onChange={e => setNewChatData({...newChatData, message: e.target.value})} placeholder="Olá, como posso ajudar?"></textarea>
                  </div>
                  <div className="pt-2">
-                    <button type="submit" disabled={isCreating} className="w-full bg-emerald-600 text-white py-2 rounded-lg font-medium hover:bg-emerald-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
-                      {isCreating ? 'Criando...' : 'Iniciar Conversa'}
-                    </button>
+                    <button type="submit" className="w-full bg-emerald-600 text-white py-2 rounded-lg font-medium hover:bg-emerald-700 transition-colors">Iniciar Conversa</button>
                  </div>
               </form>
            </div>
@@ -114,9 +101,14 @@ export const ChatSidebar = ({ tickets, currentUser, selectedId, onSelect, onCrea
       <div className="p-4 border-b border-gray-200 bg-gray-50/50">
         <div className="flex justify-between items-center mb-4">
            <h2 className="font-bold text-gray-700">Inbox</h2>
-           <button onClick={() => setShowNewChat(true)} className="text-xs bg-emerald-600 text-white hover:bg-emerald-700 px-3 py-1.5 rounded-full flex items-center gap-1 transition-colors shadow-sm">
-             <PlusCircle size={14} /> Nova
-           </button>
+           <div className="flex gap-2">
+             <button onClick={() => setShowNewChat(true)} className="text-xs bg-emerald-600 text-white hover:bg-emerald-700 px-3 py-1.5 rounded-full flex items-center gap-1 transition-colors shadow-sm">
+               <PlusCircle size={14} /> Nova
+             </button>
+             <button onClick={onSimulate} disabled={isSimulating} className="text-xs bg-slate-900 text-white hover:bg-slate-700 px-3 py-1.5 rounded-full flex items-center gap-1 transition-colors disabled:opacity-50">
+               {isSimulating ? <Loader2 size={12} className="animate-spin"/> : <Sparkles size={12} />} Teste
+             </button>
+           </div>
         </div>
         <div className="relative mb-3">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
