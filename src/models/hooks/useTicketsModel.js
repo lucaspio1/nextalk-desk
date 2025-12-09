@@ -3,13 +3,17 @@ import { TicketService } from '../services/TicketService';
 
 export const useTicketsModel = (user) => {
   const [tickets, setTickets] = useState([]);
+  const [updateTrigger, setUpdateTrigger] = useState(0);
 
   useEffect(() => {
     if (!user) return;
 
     // Função para carregar tickets do localStorage
     const loadTickets = () => {
+      console.log('[useTicketsModel] Carregando tickets do localStorage...');
       const docs = TicketService.getTickets();
+      console.log('[useTicketsModel] Tickets carregados:', docs.length);
+
       // Ordena por data de criação (mais recentes primeiro)
       docs.sort((a, b) => {
         const dateA = new Date(a.createdAt).getTime();
@@ -24,16 +28,46 @@ export const useTicketsModel = (user) => {
 
     // Escuta mudanças nos tickets
     const handleTicketsUpdate = () => {
+      console.log('[useTicketsModel] Evento ticketsUpdated recebido!');
       loadTickets();
     };
 
     window.addEventListener('ticketsUpdated', handleTicketsUpdate);
 
+    // Também monitora mudanças no localStorage diretamente
+    const handleStorageChange = (e) => {
+      if (e.key === 'tickets' || e.storageArea === localStorage) {
+        console.log('[useTicketsModel] localStorage mudou, recarregando tickets...');
+        loadTickets();
+      }
+    };
+
+    window.addEventListener('storage', handleStorageChange);
+
+    // Força reload a cada mudança no trigger
+    if (updateTrigger > 0) {
+      loadTickets();
+    }
+
     // Cleanup
     return () => {
       window.removeEventListener('ticketsUpdated', handleTicketsUpdate);
+      window.removeEventListener('storage', handleStorageChange);
     };
-  }, [user]);
+  }, [user, updateTrigger]);
+
+  // Força atualização manual (útil para debug)
+  useEffect(() => {
+    const interval = setInterval(() => {
+      const docs = TicketService.getTickets();
+      if (docs.length !== tickets.length) {
+        console.log('[useTicketsModel] Detectada mudança no número de tickets, atualizando...');
+        setUpdateTrigger(prev => prev + 1);
+      }
+    }, 1000); // Verifica a cada 1 segundo
+
+    return () => clearInterval(interval);
+  }, [tickets.length]);
 
   const stats = useMemo(() => {
     const closed = tickets.filter(t => t.status === 'closed');

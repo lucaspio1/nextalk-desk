@@ -23,6 +23,15 @@ export const LocalStorageService = {
     };
     collection.push(newDoc);
     localStorage.setItem(collectionName, JSON.stringify(collection));
+
+    // Dispara evento para atualização em tempo real
+    console.log('[LocalStorageService] Disparando evento de atualização...');
+    window.dispatchEvent(new StorageEvent('storage', {
+      key: collectionName,
+      newValue: JSON.stringify(collection),
+      storageArea: localStorage
+    }));
+
     return { id };
   },
 
@@ -33,6 +42,13 @@ export const LocalStorageService = {
     if (index !== -1) {
       collection[index] = { ...collection[index], ...data };
       localStorage.setItem(collectionName, JSON.stringify(collection));
+
+      // Dispara evento para atualização em tempo real
+      window.dispatchEvent(new StorageEvent('storage', {
+        key: collectionName,
+        newValue: JSON.stringify(collection),
+        storageArea: localStorage
+      }));
     }
   },
 
