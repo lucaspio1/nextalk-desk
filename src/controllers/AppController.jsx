@@ -49,15 +49,23 @@ export default function AppController() {
         timestamp: Date.now()
       }] : [];
 
-      const docRef = await TicketService.createTicket({
-        customerName: name,
-        customerPhone: phone,
-        status: 'active',
-        agentId: authModel.profile.name,
-        messages: initialMessages,
-        aiCategory: 'Outros',
-        aiPriority: 'Normal'
-      });
+      // Add timeout to prevent infinite hanging
+      const createWithTimeout = Promise.race([
+        TicketService.createTicket({
+          customerName: name,
+          customerPhone: phone,
+          status: 'active',
+          agentId: authModel.profile.name,
+          messages: initialMessages,
+          aiCategory: 'Outros',
+          aiPriority: 'Normal'
+        }),
+        new Promise((_, reject) =>
+          setTimeout(() => reject(new Error('Timeout: Firebase não respondeu em 10 segundos. Verifique sua conexão e configuração do Firebase.')), 10000)
+        )
+      ]);
+
+      const docRef = await createWithTimeout;
 
       console.log('[handleCreateTicket] Ticket criado com ID:', docRef.id);
 

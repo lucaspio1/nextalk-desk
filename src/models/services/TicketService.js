@@ -6,13 +6,26 @@ const collectionRef = collection(db, 'artifacts', appId, 'public', 'data', 'tick
 
 export const TicketService = {
   collectionRef,
-  
+
   async createTicket(ticketData) {
-    return await addDoc(collectionRef, {
-      ...ticketData,
-      createdAt: serverTimestamp(),
-      messages: ticketData.messages.map(m => ({ ...m, timestamp: Date.now() }))
-    });
+    console.log('[TicketService] Iniciando criação no Firebase...');
+    try {
+      const docRef = await addDoc(collectionRef, {
+        ...ticketData,
+        createdAt: serverTimestamp(),
+        messages: ticketData.messages.map(m => ({ ...m, timestamp: Date.now() }))
+      });
+      console.log('[TicketService] Ticket criado com sucesso no Firebase:', docRef.id);
+      return docRef;
+    } catch (error) {
+      console.error('[TicketService] Erro ao criar ticket no Firebase:', error);
+      console.error('[TicketService] Detalhes do erro:', {
+        code: error.code,
+        message: error.message,
+        name: error.name
+      });
+      throw error;
+    }
   },
 
   async updateTicket(ticketId, data) {
