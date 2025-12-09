@@ -69,7 +69,16 @@ export default function AppController() {
 
       // Select the new ticket
       console.log('[handleCreateTicket] Selecionando ticket:', docRef.id);
-      setSelectedTicketId(docRef.id);
+
+      // Força reload da lista de tickets
+      console.log('[handleCreateTicket] Forçando reload da lista de tickets...');
+      window.dispatchEvent(new CustomEvent('ticketsUpdated'));
+
+      // Aguarda um pouco para garantir que a lista foi atualizada antes de selecionar
+      setTimeout(() => {
+        setSelectedTicketId(docRef.id);
+        console.log('[handleCreateTicket] Ticket selecionado');
+      }, 200);
     } catch (error) {
       console.error('[handleCreateTicket] Erro ao criar ticket:', error);
       alert('Erro ao criar conversa: ' + error.message);
