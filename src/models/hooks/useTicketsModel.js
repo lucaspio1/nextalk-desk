@@ -1,92 +1,29 @@
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo } from 'react';
+import { onSnapshot } from 'firebase/firestore';
 import { TicketService } from '../services/TicketService';
 
 export const useTicketsModel = (user) => {
   const [tickets, setTickets] = useState([]);
-  const [updateTrigger, setUpdateTrigger] = useState(0);
-
-  // Função para carregar tickets (usando useCallback para evitar problemas de closure)
-  const loadTickets = useCallback(() => {
-    console.log('[useTicketsModel] Carregando tickets do localStorage...');
-    const docs = TicketService.getTickets();
-    console.log('[useTicketsModel] Tickets carregados:', docs.length);
-
-    // Ordena por data de criação (mais recentes primeiro)
-    docs.sort((a, b) => {
-      const dateA = new Date(a.createdAt).getTime();
-      const dateB = new Date(b.createdAt).getTime();
-      return dateB - dateA;
-    });
-    setTickets(docs);
-  }, []);
 
   useEffect(() => {
     if (!user) return;
-
-    // Carrega tickets inicialmente
-    loadTickets();
-
-    // Escuta mudanças nos tickets
-    const handleTicketsUpdate = () => {
-      console.log('[useTicketsModel] Evento ticketsUpdated recebido!');
-      loadTickets();
-    };
-
-    window.addEventListener('ticketsUpdated', handleTicketsUpdate);
-
-    // Também monitora mudanças no localStorage diretamente
-    const handleStorageChange = (e) => {
-      console.log('[useTicketsModel] localStorage mudou, recarregando tickets...', e);
-      loadTickets();
-    };
-
-    window.addEventListener('storage', handleStorageChange);
-
-    // Cleanup
-    return () => {
-      window.removeEventListener('ticketsUpdated', handleTicketsUpdate);
-      window.removeEventListener('storage', handleStorageChange);
-    };
-  }, [user, loadTickets]);
-
-  // UseEffect separado para reagir a mudanças no trigger
-  useEffect(() => {
-    if (updateTrigger > 0 && user) {
-      console.log('[useTicketsModel] UpdateTrigger mudou, recarregando...', updateTrigger);
-      loadTickets();
-    }
-  }, [updateTrigger, user, loadTickets]);
-
-  // Força atualização manual (útil para debug)
-  useEffect(() => {
-    const interval = setInterval(() => {
-      const docs = TicketService.getTickets();
-      if (docs.length !== tickets.length) {
-        console.log('[useTicketsModel] Detectada mudança no número de tickets, atualizando...');
-        setUpdateTrigger(prev => prev + 1);
-      }
-    }, 1000); // Verifica a cada 1 segundo
-
-    return () => clearInterval(interval);
-  }, [tickets.length]);
+    const unsubscribe = onSnapshot(TicketService.collectionRef, (snapshot) => {
+      const docs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      docs.sort((a, b) => (b.createdAt?.toMillis() || 0) - (a.createdAt?.toMillis() || 0));
+      setTickets(docs);
+    });
+    return () => unsubscribe();
+  }, [user]);
 
   const stats = useMemo(() => {
     const closed = tickets.filter(t => t.status === 'closed');
-    const open = tickets.filter(t => t.status === 'open');
+    const open = tickets.filter(t => t.status === 'open' || t.status === 'analyzing');
     const active = tickets.filter(t => t.status === 'active');
 
     let totalWait = 0, totalHandle = 0;
     closed.forEach(t => {
-      if (t.startedAt && t.createdAt) {
-        const startedDate = new Date(t.startedAt).getTime();
-        const createdDate = new Date(t.createdAt).getTime();
-        totalWait += (startedDate - createdDate) / 1000; // em segundos
-      }
-      if (t.closedAt && t.startedAt) {
-        const closedDate = new Date(t.closedAt).getTime();
-        const startedDate = new Date(t.startedAt).getTime();
-        totalHandle += (closedDate - startedDate) / 1000; // em segundos
-      }
+      if(t.startedAt && t.createdAt) totalWait += (t.startedAt.seconds - t.createdAt.seconds);
+      if(t.closedAt && t.startedAt) totalHandle += (t.closedAt.seconds - t.startedAt.seconds);
     });
 
     const byAgent = {};
