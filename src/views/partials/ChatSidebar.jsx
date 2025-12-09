@@ -1,8 +1,8 @@
 import React, { useState, useMemo } from 'react';
-import { Loader2, PlusCircle, Search, CheckCircle, User, X, Sparkles } from 'lucide-react';
+import { PlusCircle, Search, CheckCircle, User, X } from 'lucide-react';
 import { Badge } from '../components/UIComponents';
 
-export const ChatSidebar = ({ tickets, currentUser, selectedId, onSelect, onSimulate, isSimulating, onCreateTicket }) => {
+export const ChatSidebar = ({ tickets, currentUser, selectedId, onSelect, onCreateTicket }) => {
   const [activeFilter, setActiveFilter] = useState('mine');
   const [showNewChat, setShowNewChat] = useState(false);
   const [newChatData, setNewChatData] = useState({ name: '', phone: '', message: '' });
@@ -11,7 +11,7 @@ export const ChatSidebar = ({ tickets, currentUser, selectedId, onSelect, onSimu
   const counts = useMemo(() => {
     return tickets.reduce((acc, t) => {
       acc.all++;
-      if (t.status === 'open' || t.status === 'analyzing') acc.waiting++;
+      if (t.status === 'open') acc.waiting++;
       if (t.status === 'active') acc.active++;
       if (t.status === 'active' && t.agentId === currentUser?.name) acc.mine++;
       return acc;
@@ -28,10 +28,10 @@ export const ChatSidebar = ({ tickets, currentUser, selectedId, onSelect, onSimu
   const filteredTickets = useMemo(() => {
     return tickets.filter(t => {
       switch(activeFilter) {
-        case 'waiting': return t.status === 'open' || t.status === 'analyzing';
+        case 'waiting': return t.status === 'open';
         case 'active': return t.status === 'active';
         case 'mine': return t.status === 'active' && t.agentId === currentUser?.name;
-        case 'all': default: return true; 
+        case 'all': default: return true;
       }
     });
   }, [tickets, activeFilter, currentUser]);
@@ -44,14 +44,10 @@ export const ChatSidebar = ({ tickets, currentUser, selectedId, onSelect, onSimu
   };
 
   const TicketItem = ({ t }) => (
-    <div onClick={() => onSelect(t)} className={`p-4 border-b border-gray-100 cursor-pointer hover:bg-gray-50 transition-colors ${selectedId === t.id ? 'bg-emerald-50 border-l-4 border-l-emerald-500' : ''} ${t.status === 'analyzing' ? 'opacity-70 pointer-events-none' : ''}`}>
+    <div onClick={() => onSelect(t)} className={`p-4 border-b border-gray-100 cursor-pointer hover:bg-gray-50 transition-colors ${selectedId === t.id ? 'bg-emerald-50 border-l-4 border-l-emerald-500' : ''}`}>
       <div className="flex justify-between mb-1">
         <span className={`font-semibold truncate ${t.status === 'closed' ? 'text-gray-500' : 'text-gray-900'}`}>{t.customerName}</span>
-        {t.status === 'analyzing' ? (
-          <span className="text-xs text-indigo-600 flex items-center gap-1"><Loader2 size={10} className="animate-spin"/> IA...</span>
-        ) : (
-          <span className="text-xs text-gray-400">{new Date(t.createdAt?.toMillis()).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}</span>
-        )}
+        <span className="text-xs text-gray-400">{new Date(t.createdAt?.toMillis()).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}</span>
       </div>
       <div className="text-sm text-gray-500 truncate mb-2">{t.messages[t.messages.length-1]?.text}</div>
       <div className="flex gap-1 flex-wrap items-center">
@@ -101,14 +97,9 @@ export const ChatSidebar = ({ tickets, currentUser, selectedId, onSelect, onSimu
       <div className="p-4 border-b border-gray-200 bg-gray-50/50">
         <div className="flex justify-between items-center mb-4">
            <h2 className="font-bold text-gray-700">Inbox</h2>
-           <div className="flex gap-2">
-             <button onClick={() => setShowNewChat(true)} className="text-xs bg-emerald-600 text-white hover:bg-emerald-700 px-3 py-1.5 rounded-full flex items-center gap-1 transition-colors shadow-sm">
-               <PlusCircle size={14} /> Nova
-             </button>
-             <button onClick={onSimulate} disabled={isSimulating} className="text-xs bg-white border border-gray-200 text-gray-600 hover:bg-gray-50 px-3 py-1.5 rounded-full flex items-center gap-1 transition-colors disabled:opacity-50">
-               {isSimulating ? <Loader2 size={12} className="animate-spin"/> : <Sparkles size={12} />} Teste
-             </button>
-           </div>
+           <button onClick={() => setShowNewChat(true)} className="text-xs bg-emerald-600 text-white hover:bg-emerald-700 px-3 py-1.5 rounded-full flex items-center gap-1 transition-colors shadow-sm">
+             <PlusCircle size={14} /> Nova
+           </button>
         </div>
         <div className="relative mb-3">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />

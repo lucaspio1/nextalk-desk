@@ -6,6 +6,7 @@ import { useAuthModel } from '../models/hooks/useAuthModel';
 import { useTicketsModel } from '../models/hooks/useTicketsModel';
 import { AIService } from '../models/services/AIService';
 import { TicketService } from '../models/services/TicketService';
+import { WhatsAppService } from '../models/services/WhatsAppService';
 
 import { LoginView } from '../views/pages/LoginView';
 import { DashboardView } from '../views/pages/DashboardView';
@@ -17,12 +18,12 @@ export default function AppController() {
   const authModel = useAuthModel();
   const ticketModel = useTicketsModel(authModel.user);
 
-  const [view, setView] = useState('chat'); 
-  const [adminTab, setAdminTab] = useState('connection'); // Padrão agora é conexão para configurar
+  const [view, setView] = useState('chat');
+  const [adminTab, setAdminTab] = useState('connection');
   const [selectedTicketId, setSelectedTicketId] = useState(null);
   const [loginError, setLoginError] = useState("");
   const [isLoggingIn, setIsLoggingIn] = useState(false);
-  const [aiState, setAiState] = useState({ replyLoading: false, summaryLoading: false, summaryData: null, triageLoading: false });
+  const [aiState, setAiState] = useState({ replyLoading: false, summaryLoading: false, summaryData: null });
 
   const handleLogin = async (email, pass) => {
     setIsLoggingIn(true);
@@ -37,48 +38,32 @@ export default function AppController() {
   };
 
   const handleCreateTicket = async ({ name, phone, message }) => {
-    // 1. Create ticket
+    // Create ticket with initial message if provided
+    const initialMessages = message.trim() ? [{
+      text: message,
+      sender: 'agent',
+      agentName: authModel.profile.name,
+      timestamp: Date.now()
+    }] : [];
+
     const docRef = await TicketService.createTicket({
       customerName: name,
-      customerPhone: phone, // Store phone
-      status: 'active', // Immediately active
-      agentId: authModel.profile.name, // Assigned to creator
-      messages: [], // Initial empty or with message
-      aiCategory: 'Outros', // Default
+      customerPhone: phone,
+      status: 'active',
+      agentId: authModel.profile.name,
+      messages: initialMessages,
+      aiCategory: 'Outros',
       aiPriority: 'Normal'
     });
 
-    // 2. If message provided, send it
+    // If message provided, also send via WhatsApp
     if (message.trim()) {
-       await TicketService.sendMessage(docRef.id, [], {
-         text: message,
-         sender: 'agent',
-         agentName: authModel.profile.name
-       }, phone);
+      const cleanPhone = phone.replace(/\D/g, '');
+      await WhatsAppService.sendMessage(cleanPhone, message);
     }
 
-    // 3. Select the new ticket
+    // Select the new ticket
     setSelectedTicketId(docRef.id);
-  };
-
-  const handleSimulateCustomer = async () => {
-    setAiState(p => ({...p, triageLoading: true}));
-    const scenarios = [
-      { t: "Bom dia, o boleto da minha instalação venceu ontem.", n: "Solar Tech" },
-      { t: "Quanto custa o plano enterprise para 10 agentes?", n: "João Silva" },
-      { t: "Meu sistema caiu, erro 500 no login.", n: "Ana Dev" }
-    ];
-    const s = scenarios[Math.floor(Math.random() * scenarios.length)];
-    const docRef = await TicketService.createTicket({
-      customerName: s.n, status: 'analyzing', agentId: null,
-      messages: [{ text: s.t, sender: 'customer' }],
-      aiCategory: '...', aiPriority: '...'
-    });
-    const analysis = await AIService.triageTicket(s.t);
-    await TicketService.updateTicket(docRef.id, {
-      status: 'open', aiCategory: analysis.category, aiPriority: analysis.priority, aiSummary: analysis.summary
-    });
-    setAiState(p => ({...p, triageLoading: false}));
   };
 
   const handleSmartReply = async (ticket, setInputFn) => {
@@ -152,14 +137,12 @@ export default function AppController() {
         {view === 'dashboard' && <DashboardView stats={ticketModel.stats} />}
         {view === 'chat' && (
           <>
-            <ChatSidebar 
-              tickets={ticketModel.tickets} 
-              currentUser={authModel.profile} 
+            <ChatSidebar
+              tickets={ticketModel.tickets}
+              currentUser={authModel.profile}
               selectedId={selectedTicketId}
-              onSelect={(t) => { if (t.status !== 'analyzing') { setSelectedTicketId(t.id); setAiState(p => ({...p, summaryData: null})); }}}
-              onSimulate={handleSimulateCustomer}
+              onSelect={(t) => { setSelectedTicketId(t.id); setAiState(p => ({...p, summaryData: null})); }}
               onCreateTicket={handleCreateTicket}
-              isSimulating={aiState.triageLoading}
             />
             <ChatWindow 
               ticket={selectedTicket}
