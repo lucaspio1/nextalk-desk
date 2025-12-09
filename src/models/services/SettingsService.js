@@ -1,18 +1,17 @@
-import { db, appId } from '../../config/firebase';
-import { collection, doc, getDoc, setDoc, updateDoc, addDoc, deleteDoc, getDocs } from 'firebase/firestore';
+import { LocalStorageService } from './LocalStorageService';
 
-const settingsRef = doc(db, 'artifacts', appId, 'public', 'data', 'settings', 'general');
-const quickResponsesRef = collection(db, 'artifacts', appId, 'public', 'data', 'quickResponses');
-const departmentsRef = collection(db, 'artifacts', appId, 'public', 'data', 'departments');
-const usersRef = collection(db, 'artifacts', appId, 'public', 'data', 'users');
+const SETTINGS_COLLECTION = 'settings';
+const QUICK_RESPONSES_COLLECTION = 'quickResponses';
+const DEPARTMENTS_COLLECTION = 'departments';
+const USERS_COLLECTION = 'users';
 
 export const SettingsService = {
   // Ajustes Gerais
   async getGeneralSettings() {
     try {
-      const docSnap = await getDoc(settingsRef);
-      if (docSnap.exists()) {
-        return docSnap.data();
+      const settings = LocalStorageService.getDoc(SETTINGS_COLLECTION, 'general');
+      if (settings) {
+        return settings;
       }
       // Retorna configurações padrão
       return {
@@ -29,7 +28,7 @@ export const SettingsService = {
 
   async updateGeneralSettings(settings) {
     try {
-      await setDoc(settingsRef, settings, { merge: true });
+      LocalStorageService.setDoc(SETTINGS_COLLECTION, 'general', settings);
       return true;
     } catch (error) {
       console.error('Erro ao atualizar configurações gerais:', error);
@@ -40,8 +39,7 @@ export const SettingsService = {
   // Respostas Rápidas
   async getQuickResponses() {
     try {
-      const snapshot = await getDocs(quickResponsesRef);
-      return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      return LocalStorageService.getCollection(QUICK_RESPONSES_COLLECTION);
     } catch (error) {
       console.error('Erro ao buscar respostas rápidas:', error);
       return [];
@@ -50,7 +48,7 @@ export const SettingsService = {
 
   async createQuickResponse(data) {
     try {
-      const docRef = await addDoc(quickResponsesRef, {
+      const docRef = LocalStorageService.addDoc(QUICK_RESPONSES_COLLECTION, {
         ...data,
         createdAt: new Date().toISOString()
       });
@@ -63,7 +61,7 @@ export const SettingsService = {
 
   async updateQuickResponse(id, data) {
     try {
-      await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'quickResponses', id), data);
+      LocalStorageService.updateDoc(QUICK_RESPONSES_COLLECTION, id, data);
       return true;
     } catch (error) {
       console.error('Erro ao atualizar resposta rápida:', error);
@@ -73,7 +71,7 @@ export const SettingsService = {
 
   async deleteQuickResponse(id) {
     try {
-      await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'quickResponses', id));
+      LocalStorageService.deleteDoc(QUICK_RESPONSES_COLLECTION, id);
       return true;
     } catch (error) {
       console.error('Erro ao deletar resposta rápida:', error);
@@ -84,8 +82,7 @@ export const SettingsService = {
   // Departamentos
   async getDepartments() {
     try {
-      const snapshot = await getDocs(departmentsRef);
-      return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      return LocalStorageService.getCollection(DEPARTMENTS_COLLECTION);
     } catch (error) {
       console.error('Erro ao buscar departamentos:', error);
       return [];
@@ -94,7 +91,7 @@ export const SettingsService = {
 
   async createDepartment(data) {
     try {
-      const docRef = await addDoc(departmentsRef, {
+      const docRef = LocalStorageService.addDoc(DEPARTMENTS_COLLECTION, {
         ...data,
         createdAt: new Date().toISOString()
       });
@@ -107,7 +104,7 @@ export const SettingsService = {
 
   async updateDepartment(id, data) {
     try {
-      await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'departments', id), data);
+      LocalStorageService.updateDoc(DEPARTMENTS_COLLECTION, id, data);
       return true;
     } catch (error) {
       console.error('Erro ao atualizar departamento:', error);
@@ -117,7 +114,7 @@ export const SettingsService = {
 
   async deleteDepartment(id) {
     try {
-      await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'departments', id));
+      LocalStorageService.deleteDoc(DEPARTMENTS_COLLECTION, id);
       return true;
     } catch (error) {
       console.error('Erro ao deletar departamento:', error);
@@ -128,8 +125,7 @@ export const SettingsService = {
   // Usuários
   async getUsers() {
     try {
-      const snapshot = await getDocs(usersRef);
-      return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      return LocalStorageService.getCollection(USERS_COLLECTION);
     } catch (error) {
       console.error('Erro ao buscar usuários:', error);
       return [];
@@ -138,7 +134,7 @@ export const SettingsService = {
 
   async createUser(data) {
     try {
-      const docRef = await addDoc(usersRef, {
+      const docRef = LocalStorageService.addDoc(USERS_COLLECTION, {
         ...data,
         createdAt: new Date().toISOString()
       });
@@ -151,7 +147,7 @@ export const SettingsService = {
 
   async updateUser(id, data) {
     try {
-      await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'users', id), data);
+      LocalStorageService.updateDoc(USERS_COLLECTION, id, data);
       return true;
     } catch (error) {
       console.error('Erro ao atualizar usuário:', error);
@@ -161,7 +157,7 @@ export const SettingsService = {
 
   async deleteUser(id) {
     try {
-      await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'users', id));
+      LocalStorageService.deleteDoc(USERS_COLLECTION, id);
       return true;
     } catch (error) {
       console.error('Erro ao deletar usuário:', error);
