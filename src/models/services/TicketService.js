@@ -21,8 +21,14 @@ export const TicketService = {
 
       console.log('[TicketService] Ticket criado com sucesso:', docRef.id);
 
-      // Dispara evento customizado para atualizar a UI em tempo real
+      // Dispara múltiplos eventos para garantir atualização
       window.dispatchEvent(new CustomEvent('ticketsUpdated'));
+      window.dispatchEvent(new Event('storage'));
+
+      // Força atualização do estado global
+      setTimeout(() => {
+        window.dispatchEvent(new CustomEvent('ticketsUpdated'));
+      }, 100);
 
       return docRef;
     } catch (error) {

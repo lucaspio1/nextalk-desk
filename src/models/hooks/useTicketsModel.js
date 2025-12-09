@@ -1,27 +1,27 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { TicketService } from '../services/TicketService';
 
 export const useTicketsModel = (user) => {
   const [tickets, setTickets] = useState([]);
   const [updateTrigger, setUpdateTrigger] = useState(0);
 
+  // Função para carregar tickets (usando useCallback para evitar problemas de closure)
+  const loadTickets = useCallback(() => {
+    console.log('[useTicketsModel] Carregando tickets do localStorage...');
+    const docs = TicketService.getTickets();
+    console.log('[useTicketsModel] Tickets carregados:', docs.length);
+
+    // Ordena por data de criação (mais recentes primeiro)
+    docs.sort((a, b) => {
+      const dateA = new Date(a.createdAt).getTime();
+      const dateB = new Date(b.createdAt).getTime();
+      return dateB - dateA;
+    });
+    setTickets(docs);
+  }, []);
+
   useEffect(() => {
     if (!user) return;
-
-    // Função para carregar tickets do localStorage
-    const loadTickets = () => {
-      console.log('[useTicketsModel] Carregando tickets do localStorage...');
-      const docs = TicketService.getTickets();
-      console.log('[useTicketsModel] Tickets carregados:', docs.length);
-
-      // Ordena por data de criação (mais recentes primeiro)
-      docs.sort((a, b) => {
-        const dateA = new Date(a.createdAt).getTime();
-        const dateB = new Date(b.createdAt).getTime();
-        return dateB - dateA;
-      });
-      setTickets(docs);
-    };
 
     // Carrega tickets inicialmente
     loadTickets();
@@ -36,25 +36,26 @@ export const useTicketsModel = (user) => {
 
     // Também monitora mudanças no localStorage diretamente
     const handleStorageChange = (e) => {
-      if (e.key === 'tickets' || e.storageArea === localStorage) {
-        console.log('[useTicketsModel] localStorage mudou, recarregando tickets...');
-        loadTickets();
-      }
+      console.log('[useTicketsModel] localStorage mudou, recarregando tickets...', e);
+      loadTickets();
     };
 
     window.addEventListener('storage', handleStorageChange);
-
-    // Força reload a cada mudança no trigger
-    if (updateTrigger > 0) {
-      loadTickets();
-    }
 
     // Cleanup
     return () => {
       window.removeEventListener('ticketsUpdated', handleTicketsUpdate);
       window.removeEventListener('storage', handleStorageChange);
     };
-  }, [user, updateTrigger]);
+  }, [user, loadTickets]);
+
+  // UseEffect separado para reagir a mudanças no trigger
+  useEffect(() => {
+    if (updateTrigger > 0 && user) {
+      console.log('[useTicketsModel] UpdateTrigger mudou, recarregando...', updateTrigger);
+      loadTickets();
+    }
+  }, [updateTrigger, user, loadTickets]);
 
   // Força atualização manual (útil para debug)
   useEffect(() => {
