@@ -1,8 +1,8 @@
 import React, { useState, useMemo } from 'react';
-import { PlusCircle, Search, CheckCircle, User, X, Loader2, Sparkles } from 'lucide-react';
+import { PlusCircle, Search, CheckCircle, User, X } from 'lucide-react';
 import { Badge } from '../components/UIComponents';
 
-export const ChatSidebar = ({ tickets, currentUser, selectedId, onSelect, onSimulate, isSimulating, onCreateTicket }) => {
+export const ChatSidebar = ({ tickets, currentUser, selectedId, onSelect, onCreateTicket }) => {
   const [activeFilter, setActiveFilter] = useState('mine');
   const [showNewChat, setShowNewChat] = useState(false);
   const [newChatData, setNewChatData] = useState({ name: '', phone: '', message: '' });
@@ -101,14 +101,9 @@ export const ChatSidebar = ({ tickets, currentUser, selectedId, onSelect, onSimu
       <div className="p-4 border-b border-gray-200 bg-gray-50/50">
         <div className="flex justify-between items-center mb-4">
            <h2 className="font-bold text-gray-700">Inbox</h2>
-           <div className="flex gap-2">
-             <button onClick={() => setShowNewChat(true)} className="text-xs bg-emerald-600 text-white hover:bg-emerald-700 px-3 py-1.5 rounded-full flex items-center gap-1 transition-colors shadow-sm">
-               <PlusCircle size={14} /> Nova
-             </button>
-             <button onClick={onSimulate} disabled={isSimulating} className="text-xs bg-slate-900 text-white hover:bg-slate-700 px-3 py-1.5 rounded-full flex items-center gap-1 transition-colors disabled:opacity-50">
-               {isSimulating ? <Loader2 size={12} className="animate-spin"/> : <Sparkles size={12} />} Teste
-             </button>
-           </div>
+           <button onClick={() => setShowNewChat(true)} className="text-xs bg-emerald-600 text-white hover:bg-emerald-700 px-3 py-1.5 rounded-full flex items-center gap-1 transition-colors shadow-sm">
+             <PlusCircle size={14} /> Nova
+           </button>
         </div>
         <div className="relative mb-3">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
