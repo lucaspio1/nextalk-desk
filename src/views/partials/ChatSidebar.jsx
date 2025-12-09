@@ -6,6 +6,7 @@ export const ChatSidebar = ({ tickets, currentUser, selectedId, onSelect, onCrea
   const [activeFilter, setActiveFilter] = useState('mine');
   const [showNewChat, setShowNewChat] = useState(false);
   const [newChatData, setNewChatData] = useState({ name: '', phone: '', message: '' });
+  const [isCreating, setIsCreating] = useState(false);
 
   // Contagem
   const counts = useMemo(() => {
@@ -36,11 +37,20 @@ export const ChatSidebar = ({ tickets, currentUser, selectedId, onSelect, onCrea
     });
   }, [tickets, activeFilter, currentUser]);
 
-  const handleCreate = (e) => {
+  const handleCreate = async (e) => {
     e.preventDefault();
-    onCreateTicket(newChatData);
-    setShowNewChat(false);
-    setNewChatData({ name: '', phone: '', message: '' });
+    console.log('[ChatSidebar] Iniciando criação de ticket:', newChatData);
+    setIsCreating(true);
+    try {
+      await onCreateTicket(newChatData);
+      console.log('[ChatSidebar] Ticket criado com sucesso');
+      setShowNewChat(false);
+      setNewChatData({ name: '', phone: '', message: '' });
+    } catch (error) {
+      console.error('[ChatSidebar] Erro ao criar ticket:', error);
+    } finally {
+      setIsCreating(false);
+    }
   };
 
   const TicketItem = ({ t }) => (
@@ -87,7 +97,9 @@ export const ChatSidebar = ({ tickets, currentUser, selectedId, onSelect, onCrea
                     <textarea className="w-full p-2 border border-gray-200 rounded text-sm focus:ring-2 focus:ring-emerald-500 outline-none resize-none" rows="3" value={newChatData.message} onChange={e => setNewChatData({...newChatData, message: e.target.value})} placeholder="Olá, como posso ajudar?"></textarea>
                  </div>
                  <div className="pt-2">
-                    <button type="submit" className="w-full bg-emerald-600 text-white py-2 rounded-lg font-medium hover:bg-emerald-700 transition-colors">Iniciar Conversa</button>
+                    <button type="submit" disabled={isCreating} className="w-full bg-emerald-600 text-white py-2 rounded-lg font-medium hover:bg-emerald-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+                      {isCreating ? 'Criando...' : 'Iniciar Conversa'}
+                    </button>
                  </div>
               </form>
            </div>

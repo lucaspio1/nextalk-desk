@@ -38,32 +38,43 @@ export default function AppController() {
   };
 
   const handleCreateTicket = async ({ name, phone, message }) => {
-    // Create ticket with initial message if provided
-    const initialMessages = message.trim() ? [{
-      text: message,
-      sender: 'agent',
-      agentName: authModel.profile.name,
-      timestamp: Date.now()
-    }] : [];
+    try {
+      console.log('[handleCreateTicket] Criando novo ticket:', { name, phone, message });
 
-    const docRef = await TicketService.createTicket({
-      customerName: name,
-      customerPhone: phone,
-      status: 'active',
-      agentId: authModel.profile.name,
-      messages: initialMessages,
-      aiCategory: 'Outros',
-      aiPriority: 'Normal'
-    });
+      // Create ticket with initial message if provided
+      const initialMessages = message.trim() ? [{
+        text: message,
+        sender: 'agent',
+        agentName: authModel.profile.name,
+        timestamp: Date.now()
+      }] : [];
 
-    // If message provided, also send via WhatsApp
-    if (message.trim()) {
-      const cleanPhone = phone.replace(/\D/g, '');
-      await WhatsAppService.sendMessage(cleanPhone, message);
+      const docRef = await TicketService.createTicket({
+        customerName: name,
+        customerPhone: phone,
+        status: 'active',
+        agentId: authModel.profile.name,
+        messages: initialMessages,
+        aiCategory: 'Outros',
+        aiPriority: 'Normal'
+      });
+
+      console.log('[handleCreateTicket] Ticket criado com ID:', docRef.id);
+
+      // If message provided, also send via WhatsApp
+      if (message.trim()) {
+        const cleanPhone = phone.replace(/\D/g, '');
+        console.log('[handleCreateTicket] Enviando mensagem via WhatsApp para:', cleanPhone);
+        await WhatsAppService.sendMessage(cleanPhone, message);
+      }
+
+      // Select the new ticket
+      console.log('[handleCreateTicket] Selecionando ticket:', docRef.id);
+      setSelectedTicketId(docRef.id);
+    } catch (error) {
+      console.error('[handleCreateTicket] Erro ao criar ticket:', error);
+      alert('Erro ao criar conversa: ' + error.message);
     }
-
-    // Select the new ticket
-    setSelectedTicketId(docRef.id);
   };
 
   const handleSmartReply = async (ticket, setInputFn) => {
