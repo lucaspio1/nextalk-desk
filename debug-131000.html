@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Debug WhatsApp - Erro 131000</title>
+  <style>
+    body { font-family: monospace; padding: 20px; background: #1e1e1e; color: #fff; }
+    .container { max-width: 900px; margin: 0 auto; }
+    button { padding: 15px; margin: 10px 0; background: #25D366; color: white; border: none; cursor: pointer; font-size: 14px; width: 100%; }
+    button:hover { background: #128C7E; }
+    .result { margin-top: 20px; padding: 15px; border-radius: 5px; white-space: pre-wrap; background: #2d2d2d; border-left: 4px solid #25D366; }
+    .error { border-left-color: #f44336; }
+    input { padding: 10px; margin: 5px 0; width: 100%; box-sizing: border-box; background: #2d2d2d; color: #fff; border: 1px solid #444; }
+    h3 { color: #25D366; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>🔍 Debug: Erro 131000 WhatsApp</h1>
+
+    <h3>Informações da Configuração Atual:</h3>
+    <div class="result">
+Phone Number ID: 823581997515238
+WABA ID: 875650458452357
+Token: EAAKNtwS6kTs... (configurado)
+    </div>
+
+    <h3>1️⃣ Testar com Número Formatado Corretamente</h3>
+    <input type="text" id="phone1" value="5548996372539" placeholder="Número sem espaços">
+    <button onclick="testSend(1)">📤 Testar Envio (Formato: 5548996372539)</button>
+    <div id="result1"></div>
+
+    <h3>2️⃣ Testar com Formato Alternativo</h3>
+    <input type="text" id="phone2" value="48996372539" placeholder="Número sem código do país">
+    <button onclick="testSend(2)">📤 Testar Envio (Formato: 48996372539)</button>
+    <div id="result2"></div>
+
+    <h3>3️⃣ Verificar Detalhes do Número</h3>
+    <button onclick="checkNumber()">🔍 Verificar Configuração do Número</button>
+    <div id="result3"></div>
+
+    <h3>4️⃣ Verificar Conta WABA</h3>
+    <button onclick="checkWABA()">🏢 Verificar Status da Conta WhatsApp Business</button>
+    <div id="result4"></div>
+
+    <hr style="border-color: #444; margin: 30px 0;">
+
+    <div style="background: #2d2d2d; padding: 15px; border-left: 4px solid #ff9800;">
+      <strong>⚠️ Sobre o Erro 131000:</strong><br><br>
+      Este erro genérico da Meta pode significar:<br>
+      1. Número de destino não verificado corretamente<br>
+      2. Número bloqueou mensagens comerciais<br>
+      3. Limitações de conta de teste<br>
+      4. Formato do número incorreto<br>
+      5. Número não existe no WhatsApp<br><br>
+
+      <strong>💡 Solução:</strong><br>
+      - Remova e adicione o número novamente na Meta<br>
+      - Use formato sem símbolos: 5548996372539<br>
+      - Confirme o código de verificação no WhatsApp<br>
+      - Considere usar um número Business próprio
+    </div>
+  </div>
+
+  <script>
+    const PHONE_ID = "823581997515238";
+    const TOKEN = "EAAKNtwS6kTsBQBZAyPjNyVKE6FS2cZBejdZA9ym0T8d9adKf58Yyxo8M9R5ZA6PmduFQa4c8YZA7a4JgASeIhk5D8YywmOm6To81BdmdcKat35ZBBqMkTHzP2cOCeVgCFiY2LTUDCRNMk7ZAdVcZCJChuoM713LbrKBSQ38iksbfbeTArQ4CyfzzYzxT7GvrsuOp87ICDmwIycvXOHnaRkwgU4GAPlEr4VBdiIp2nn82SgAY5j8ESx8bRQxrbxeL2ZAk9tV2Gbc55l22PWQu3sw1g";
+
+    async function testSend(testNum) {
+      const phone = document.getElementById(`phone${testNum}`).value;
+      const resultDiv = document.getElementById(`result${testNum}`);
+
+      resultDiv.innerHTML = '<div class="result">⏳ Enviando...</div>';
+
+      try {
+        const response = await fetch(`https://graph.facebook.com/v19.0/${PHONE_ID}/messages`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${TOKEN}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            messaging_product: "whatsapp",
+            to: phone,
+            type: "text",
+            text: { body: `Teste ${testNum} - ${new Date().toLocaleTimeString()}` }
+          })
+        });
+
+        const data = await response.json();
+
+        if (response.ok) {
+          resultDiv.innerHTML = `<div class="result">
+✅ SUCESSO! Mensagem enviada para: ${phone}
+
+ID da mensagem: ${data.messages[0].id}
+
+Verifique seu WhatsApp!
+          </div>`;
+        } else {
+          resultDiv.innerHTML = `<div class="result error">
+❌ ERRO ${data.error.code}: ${data.error.message}
+
+Detalhes:
+${JSON.stringify(data, null, 2)}
+
+${getErrorSolution(data.error.code)}
+          </div>`;
+        }
+      } catch (error) {
+        resultDiv.innerHTML = `<div class="result error">❌ Erro de rede: ${error.message}</div>`;
+      }
+    }
+
+    async function checkNumber() {
+      const resultDiv = document.getElementById('result3');
+      resultDiv.innerHTML = '<div class="result">⏳ Verificando...</div>';
+
+      try {
+        const response = await fetch(`https://graph.facebook.com/v19.0/${PHONE_ID}`, {
+          headers: { 'Authorization': `Bearer ${TOKEN}` }
+        });
+
+        const data = await response.json();
+
+        if (response.ok) {
+          resultDiv.innerHTML = `<div class="result">
+✅ Informações do Número:
+
+Nome verificado: ${data.verified_name}
+Status de verificação: ${data.code_verification_status}
+Número de exibição: ${data.display_phone_number}
+Quality Rating: ${data.quality_rating}
+Tipo de plataforma: ${data.platform_type}
+
+Detalhes completos:
+${JSON.stringify(data, null, 2)}
+          </div>`;
+        } else {
+          resultDiv.innerHTML = `<div class="result error">❌ Erro: ${JSON.stringify(data, null, 2)}</div>`;
+        }
+      } catch (error) {
+        resultDiv.innerHTML = `<div class="result error">❌ Erro: ${error.message}</div>`;
+      }
+    }
+
+    async function checkWABA() {
+      const resultDiv = document.getElementById('result4');
+      resultDiv.innerHTML = '<div class="result">⏳ Verificando conta...</div>';
+
+      try {
+        const response = await fetch(`https://graph.facebook.com/v19.0/875650458452357`, {
+          headers: { 'Authorization': `Bearer ${TOKEN}` }
+        });
+
+        const data = await response.json();
+
+        if (response.ok) {
+          resultDiv.innerHTML = `<div class="result">
+✅ Informações da Conta WABA:
+
+${JSON.stringify(data, null, 2)}
+          </div>`;
+        } else {
+          resultDiv.innerHTML = `<div class="result error">
+❌ Erro ao verificar WABA:
+
+${JSON.stringify(data, null, 2)}
+
+Possível problema de permissões do token.
+          </div>`;
+        }
+      } catch (error) {
+        resultDiv.innerHTML = `<div class="result error">❌ Erro: ${error.message}</div>`;
+      }
+    }
+
+    function getErrorSolution(code) {
+      const solutions = {
+        131000: `
+🔧 SOLUÇÃO para erro 131000:
+
+1. Remova o número da lista de destinatários na Meta
+2. Adicione novamente usando formato: 5548996372539
+3. Confirme o código de 6 dígitos no WhatsApp
+4. Aguarde 1-2 minutos
+5. Tente enviar novamente
+
+OU considere:
+- Usar um número Business próprio (não de teste)
+- Verificar se o número existe no WhatsApp
+- Verificar se o número não bloqueou empresas
+        `,
+        131047: 'Número não está na lista de destinatários permitidos.',
+        190: 'Token de acesso expirado. Gere um novo token.',
+        100: 'Parâmetro inválido. Verifique o formato do número.'
+      };
+
+      return solutions[code] || 'Consulte: https://developers.facebook.com/docs/whatsapp/cloud-api/support/error-codes';
+    }
+  </script>
+</body>
+</html>
