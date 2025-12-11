@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Monitor, User, ArrowRightLeft, Users, Tag, CheckCircle, X, Sparkles, Send, RotateCcw } from 'lucide-react';
+import { Monitor, User, ArrowRightLeft, Users, Tag, CheckCircle, X, Sparkles, Send, RotateCcw, StickyNote, FileText, Loader2, Check } from 'lucide-react';
 import { Button } from '../components/UIComponents';
 
 const ChatHeaderAction = ({ icon: Icon, label, active, onClick, dropdown }) => (
@@ -16,12 +16,49 @@ const ChatHeaderAction = ({ icon: Icon, label, active, onClick, dropdown }) => (
   </div>
 );
 
-export const ChatWindow = ({ ticket, currentUser, onSend, onClose, onPick, onTransfer, onReopen, aiActions }) => {
+export const ChatWindow = ({ ticket, currentUser, onSend, onClose, onPick, onTransfer, onReopen, onUpdate, aiActions }) => {
   const [input, setInput] = useState("");
+  const [notes, setNotes] = useState("");
+  const [saveStatus, setSaveStatus] = useState("saved"); // 'saved', 'saving', 'typing'
   const [activePopover, setActivePopover] = useState(null);
   const messagesEndRef = useRef(null);
 
-  useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }); }, [ticket?.messages]);
+  useEffect(() => { 
+      messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }); 
+  }, [ticket?.messages]);
+
+  // Carrega as notas apenas quando muda o ID do ticket (evita sobrescrever enquanto digita)
+  useEffect(() => {
+      if (ticket) {
+          setNotes(ticket.notes || "");
+          setSaveStatus("saved");
+      }
+  }, [ticket?.id]);
+
+  // Lógica de Salvamento Automático (Debounce)
+  useEffect(() => {
+      if (!ticket) return;
+      
+      // Se a nota atual for igual a do banco, não faz nada
+      if (notes === (ticket.notes || "")) {
+          setSaveStatus("saved");
+          return;
+      }
+
+      setSaveStatus("typing");
+
+      const timer = setTimeout(() => {
+          setSaveStatus("saving");
+          if (onUpdate) {
+              onUpdate(ticket.id, { notes }).then(() => {
+                  setSaveStatus("saved");
+              });
+          }
+      }, 1500); // Salva 1.5s após parar de digitar
+
+      return () => clearTimeout(timer);
+  }, [notes]);
+
   const handleSend = () => { if(input.trim()) { onSend(input); setInput(""); } };
   
   if (!ticket) return (
@@ -81,13 +118,7 @@ export const ChatWindow = ({ ticket, currentUser, onSend, onClose, onPick, onTra
 
         {/* MESSAGES */}
         <div className="flex-1 overflow-y-auto p-4 lg:p-8 space-y-6 z-10 relative bg-[#efe7dd] bg-opacity-50">
-          {aiActions.summary && (
-            <div className="mx-auto max-w-lg bg-white/95 backdrop-blur-sm p-4 rounded-lg shadow-sm border border-emerald-100 relative animate-in fade-in slide-in-from-top-4">
-                <button onClick={aiActions.onClearSummary} className="absolute top-2 right-2 text-gray-400 hover:text-gray-600"><X size={14}/></button>
-                <div className="flex items-center gap-2 text-emerald-600 font-bold text-xs mb-2 uppercase tracking-wide"><Sparkles size={14}/> Resumo Inteligente</div>
-                <div className="text-sm text-gray-700 whitespace-pre-line leading-relaxed">{aiActions.summary.text}</div>
-            </div>
-          )}
+          {/* Resumo removido daqui para ir para a lateral */}
           {ticket.messages.map((msg, idx) => {
             const isMe = msg.sender === 'agent';
             const isSystem = msg.sender === 'system';
@@ -129,13 +160,62 @@ export const ChatWindow = ({ ticket, currentUser, onSend, onClose, onPick, onTra
         )}
       </div>
       
-      {/* RIGHT SIDEBAR - ATUALIZADO */}
-      <div className="w-80 bg-white border-l border-gray-200 hidden xl:flex flex-col h-full shrink-0 overflow-y-auto">
-         <div className="p-6 border-b border-gray-100 flex items-center gap-3">
-            <div className="w-12 h-12 bg-gray-200 rounded-full flex items-center justify-center text-gray-500 font-bold text-lg">{currentUser.name.charAt(0)}</div>
-            <div><h3 className="font-bold text-gray-800">{currentUser.name}</h3><span className="text-xs text-gray-500 uppercase font-medium">{currentUser.role === 'manager' ? 'Admin' : 'Agente'}</span></div>
+      {/* RIGHT SIDEBAR - RESUMO & ANOTAÇÕES */}
+      <div className="w-80 bg-white border-l border-gray-200 hidden xl:flex flex-col h-full shrink-0">
+         
+         {/* SEÇÃO 1: RESUMO IA */}
+         <div className="p-4 border-b border-gray-200 bg-emerald-50/30">
+            <h3 className="font-bold text-gray-700 flex items-center gap-2 mb-3 text-sm uppercase tracking-wide">
+                <Sparkles size={16} className="text-emerald-500"/> Resumo Inteligente
+            </h3>
+            
+            {aiActions.loadingSummary ? (
+                <div className="text-center py-4 text-gray-400 text-xs flex flex-col items-center gap-2">
+                    <Loader2 size={20} className="animate-spin text-emerald-500"/>
+                    Gerando resumo...
+                </div>
+            ) : aiActions.summary?.id === ticket.id ? (
+                <div className="text-sm text-gray-600 leading-relaxed bg-white p-3 rounded border border-emerald-100 shadow-sm animate-in fade-in">
+                    {aiActions.summary.text}
+                </div>
+            ) : (
+                <div className="text-center">
+                    <p className="text-xs text-gray-400 mb-3">Gere um resumo rápido desta conversa para entender o contexto.</p>
+                    <button onClick={aiActions.onSummarize} className="w-full bg-white border border-emerald-200 text-emerald-600 hover:bg-emerald-50 py-2 rounded-lg text-xs font-bold transition-colors shadow-sm">
+                        Gerar Resumo
+                    </button>
+                </div>
+            )}
          </div>
-         {/* Seção removida aqui */}
+
+         {/* SEÇÃO 2: ANOTAÇÕES */}
+         <div className="flex-1 flex flex-col overflow-hidden bg-gray-50/30">
+             <div className="p-4 border-b border-gray-200 flex items-center justify-between bg-white">
+                <h3 className="font-bold text-gray-700 flex items-center gap-2 text-sm uppercase tracking-wide">
+                    <StickyNote size={16} className="text-yellow-500"/> Anotações
+                </h3>
+                <div className="text-[10px] font-medium flex items-center gap-1">
+                    {saveStatus === 'saving' && <span className="text-gray-400 flex items-center gap-1"><Loader2 size={10} className="animate-spin"/> Salvando...</span>}
+                    {saveStatus === 'saved' && <span className="text-emerald-600 flex items-center gap-1"><Check size={12}/> Salvo</span>}
+                    {saveStatus === 'typing' && <span className="text-gray-400">Digitando...</span>}
+                </div>
+             </div>
+             
+             <div className="p-4 flex-1 flex flex-col min-h-0">
+                <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-1 shadow-sm flex-1 flex flex-col relative focus-within:ring-2 focus-within:ring-yellow-400/50 transition-all">
+                    <textarea 
+                        className="w-full h-full p-3 bg-transparent outline-none resize-none text-sm text-gray-700 leading-relaxed" 
+                        placeholder="Escreva aqui observações internas..."
+                        value={notes}
+                        onChange={e => setNotes(e.target.value)}
+                    ></textarea>
+                </div>
+                <p className="text-[10px] text-gray-400 mt-2 text-center">
+                    Auto-save ativo. Visível apenas internamente.
+                </p>
+             </div>
+         </div>
+
       </div>
     </div>
   );

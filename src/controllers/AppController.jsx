@@ -15,10 +15,6 @@ import { ChatWindow } from '../views/partials/ChatWindow';
 
 export default function AppController() {
   const authModel = useAuthModel();
-  
-  // CORREÇÃO AQUI: Usamos authModel.profile em vez de authModel.user
-  // Isto garante que o sistema de tickets inicie assim que fazemos o login "demo",
-  // sem esperar pela conexão real do Firebase (que não existe).
   const ticketModel = useTicketsModel(authModel.profile);
 
   const [view, setView] = useState('chat');
@@ -41,7 +37,6 @@ export default function AppController() {
   };
 
   const handleCreateTicket = async ({ name, phone, message }) => {
-    // Cria o ticket usando o serviço (agora em modo Mock/Demo)
     const docRef = await TicketService.createTicket({
       customerName: name,
       customerPhone: phone,
@@ -49,12 +44,11 @@ export default function AppController() {
       agentId: authModel.profile.name,
       messages: message.trim() ? [{ text: message, sender: 'agent', agentName: authModel.profile.name }] : [],
       aiCategory: 'Outros',
-      aiPriority: 'Normal'
+      aiPriority: 'Normal',
+      notes: '' // Campo inicial de notas
     });
-    // Seleciona o ticket recém-criado para abrir a janela de chat imediatamente
     setSelectedTicketId(docRef.id);
   };
-
 
   const handleSmartReply = async (ticket, setInputFn) => {
     setAiState(p => ({...p, replyLoading: true}));
@@ -99,6 +93,11 @@ export default function AppController() {
     }, ticket.customerPhone);
   };
 
+  // Nova função para atualizar dados gerais do ticket (como notas)
+  const handleUpdateTicket = async (ticketId, data) => {
+    await TicketService.updateTicket(ticketId, data);
+  };
+
   const selectedTicket = ticketModel.tickets.find(t => t.id === selectedTicketId);
 
   if (!authModel.profile) return <LoginView onLogin={handleLogin} isLoading={isLoggingIn} error={loginError} />;
@@ -140,6 +139,7 @@ export default function AppController() {
               onSend={(txt) => TicketService.sendMessage(selectedTicket.id, selectedTicket.messages, { text: txt, sender: 'agent', agentName: authModel.profile.name })}
               onTransfer={handleTransfer}
               onReopen={handleReopen}
+              onUpdate={handleUpdateTicket} // Passando a função nova
               onClose={() => { TicketService.updateTicket(selectedTicket.id, { status: 'closed', closedAt: serverTimestamp() }); setSelectedTicketId(null); }}
               onPick={() => TicketService.updateTicket(selectedTicket.id, { status: 'active', agentId: authModel.profile.name, startedAt: serverTimestamp() })}
               aiActions={{
