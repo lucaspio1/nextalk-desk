@@ -2,7 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { PlusCircle, Search, CheckCircle, User, X, Loader2 } from 'lucide-react';
 import { Badge } from '../components/UIComponents';
 
-export const ChatSidebar = ({ tickets, currentUser, selectedId, onSelect, onCreateTicket }) => {
+export const ChatSidebar = ({ tickets, currentUser, selectedId, onSelect, onCreateTicket, tags = [] }) => {
   const [activeFilter, setActiveFilter] = useState('mine');
   const [showNewChat, setShowNewChat] = useState(false);
   const [newChatData, setNewChatData] = useState({ name: '', phone: '', message: '' });
@@ -77,6 +77,23 @@ export const ChatSidebar = ({ tickets, currentUser, selectedId, onSelect, onCrea
         {t.status === 'closed' && <span className="w-2 h-2 rounded-full bg-gray-400 mr-1" title="Finalizado"></span>}
         {t.aiCategory && <Badge text={t.aiCategory} />}
         {t.aiPriority && <Badge text={t.aiPriority} />}
+        {t.tags && t.tags.length > 0 && t.tags.slice(0, 2).map((tag, idx) => {
+          const tagData = tags.find(tg => tg.id === tag.id || tg.name === tag.name || tg.name === tag);
+          if (!tagData) return null;
+          return (
+            <span
+              key={idx}
+              className="text-[10px] px-1.5 py-0.5 rounded-full font-medium"
+              style={{
+                backgroundColor: tagData.color + '20',
+                color: tagData.color,
+                border: `1px solid ${tagData.color}40`
+              }}
+            >
+              {tagData.name}
+            </span>
+          );
+        })}
         {t.agentId && t.agentId !== currentUser?.name && (
           <span className="text-[10px] text-gray-400 ml-auto flex items-center gap-1"><User size={10}/> {t.agentId.split(' ')[0]}</span>
         )}
