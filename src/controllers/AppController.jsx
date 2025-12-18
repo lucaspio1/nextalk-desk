@@ -25,6 +25,19 @@ export default function AppController() {
   const [isLoggingIn, setIsLoggingIn] = useState(false);
   const [aiState, setAiState] = useState({ replyLoading: false, summaryLoading: false, summaryData: null });
 
+  // Optimistic updates - Estado local que sobrescreve temporariamente os tickets do polling
+  const [optimisticTickets, setOptimisticTickets] = useState({});
+
+  // Mescla tickets do polling com updates otimistas locais
+  const mergedTickets = ticketModel.tickets.map(ticket => {
+    if (optimisticTickets[ticket.id]) {
+      return { ...ticket, ...optimisticTickets[ticket.id] };
+    }
+    return ticket;
+  });
+
+  const selectedTicket = mergedTickets.find(t => t.id === selectedTicketId);
+
   const handleLogin = async (email, pass) => {
     setIsLoggingIn(true);
     try {
@@ -109,7 +122,76 @@ export default function AppController() {
     await TicketService.updateTicket(ticketId, data);
   };
 
-  const selectedTicket = ticketModel.tickets.find(t => t.id === selectedTicketId);
+  // Função otimizada para enviar mensagem com optimistic update
+  const handleSendMessage = async (txt) => {
+    if (!selectedTicket) return;
+
+    const newMessage = {
+      text: txt,
+      sender: 'agent',
+      agentName: authModel.profile.name,
+      timestamp: new Date().toISOString()
+    };
+
+    // Optimistic update - Adiciona mensagem imediatamente na UI
+    setOptimisticTickets(prev => ({
+      ...prev,
+      [selectedTicket.id]: {
+        ...prev[selectedTicket.id],
+        messages: [...selectedTicket.messages, newMessage]
+      }
+    }));
+
+    // Envia para o servidor em background
+    await TicketService.sendMessage(
+      selectedTicket.id,
+      selectedTicket.messages,
+      newMessage,
+      selectedTicket.customerPhone
+    );
+
+    // Remove o optimistic update após 3 segundos (tempo para o polling sincronizar)
+    setTimeout(() => {
+      setOptimisticTickets(prev => {
+        const updated = { ...prev };
+        if (updated[selectedTicket.id]?.messages) {
+          delete updated[selectedTicket.id];
+        }
+        return updated;
+      });
+    }, 3000);
+  };
+
+  // Função otimizada para iniciar atendimento com optimistic update
+  const handlePickTicket = async () => {
+    if (!selectedTicket) return;
+
+    // Optimistic update - Muda status imediatamente na UI
+    setOptimisticTickets(prev => ({
+      ...prev,
+      [selectedTicket.id]: {
+        status: 'active',
+        agentId: authModel.profile.name,
+        startedAt: new Date()
+      }
+    }));
+
+    // Atualiza no servidor em background
+    await TicketService.updateTicket(selectedTicket.id, {
+      status: 'active',
+      agentId: authModel.profile.name,
+      startedAt: new Date()
+    });
+
+    // Remove o optimistic update após 3 segundos (tempo para o polling sincronizar)
+    setTimeout(() => {
+      setOptimisticTickets(prev => {
+        const updated = { ...prev };
+        delete updated[selectedTicket.id];
+        return updated;
+      });
+    }, 3000);
+  };
 
   if (!authModel.profile) return <LoginView onLogin={handleLogin} isLoading={isLoggingIn} error={loginError} />;
 
@@ -138,7 +220,7 @@ export default function AppController() {
         {view === 'chat' && (
           <>
             <ChatSidebar
-              tickets={ticketModel.tickets}
+              tickets={mergedTickets}
               currentUser={authModel.profile}
               selectedId={selectedTicketId}
               tags={settingsModel.tags}
@@ -153,12 +235,12 @@ export default function AppController() {
               tags={settingsModel.tags}
               reasons={settingsModel.reasons}
               quickResponses={settingsModel.quickResponses}
-              onSend={(txt) => TicketService.sendMessage(selectedTicket.id, selectedTicket.messages, { text: txt, sender: 'agent', agentName: authModel.profile.name }, selectedTicket.customerPhone)}
+              onSend={handleSendMessage}
               onTransfer={handleTransfer}
               onReopen={handleReopen}
-              onUpdate={handleUpdateTicket} // Passando a função nova
+              onUpdate={handleUpdateTicket}
               onClose={() => { TicketService.updateTicket(selectedTicket.id, { status: 'closed', closedAt: new Date() }); setSelectedTicketId(null); }}
-              onPick={() => TicketService.updateTicket(selectedTicket.id, { status: 'active', agentId: authModel.profile.name, startedAt: new Date() })}
+              onPick={handlePickTicket}
               aiActions={{
                 onSmartReply: handleSmartReply,
                 onSummarize: handleSummarize,
