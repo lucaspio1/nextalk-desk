@@ -45,11 +45,11 @@ export const SettingsService = {
     // Busca inicial
     this.getGeneralSettings().then(callback);
 
-    // Pooling a cada 10 segundos
+    // Pooling a cada 5 segundos (reduzido de 10s)
     const interval = setInterval(async () => {
       const settings = await this.getGeneralSettings();
       callback(settings);
-    }, 10000);
+    }, 5000);
 
     return () => clearInterval(interval);
   },
@@ -113,7 +113,7 @@ export const SettingsService = {
     this.getQuickResponses().then(callback);
     const interval = setInterval(async () => {
       callback(await this.getQuickResponses());
-    }, 10000);
+    }, 5000);
     return () => clearInterval(interval);
   },
 
@@ -181,7 +181,7 @@ export const SettingsService = {
         crud.getAll().then(callback);
         const interval = setInterval(async () => {
           callback(await crud.getAll());
-        }, 10000);
+        }, 5000);
         return () => clearInterval(interval);
       }
     };
