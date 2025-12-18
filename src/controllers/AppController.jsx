@@ -70,19 +70,28 @@ export default function AppController() {
 
   const handleTransfer = async (ticket, target) => {
     if (!ticket) return;
+
+    // Optimistic update - Remove da visualização imediatamente
+    if (target !== authModel.profile.name) {
+      setSelectedTicketId(null);
+    }
+
     // Verifica se o target é um departamento (comparando com a lista de departamentos do banco)
     const isDept = settingsModel.departments.some(d => d.name === target);
-    await TicketService.sendMessage(ticket.id, ticket.messages, {
-      text: `Ticket transferido para ${target}`,
-      sender: 'system',
-      agentName: 'System'
-    }, ticket.customerPhone);
-    await TicketService.updateTicket(ticket.id, {
-      agentId: isDept ? null : target,
-      status: isDept ? 'open' : 'active',
-      aiCategory: isDept ? target : ticket.aiCategory
-    });
-    if (target !== authModel.profile.name) setSelectedTicketId(null);
+
+    // Executa as operações em paralelo para melhor performance
+    await Promise.all([
+      TicketService.sendMessage(ticket.id, ticket.messages, {
+        text: `Ticket transferido para ${target}`,
+        sender: 'system',
+        agentName: 'System'
+      }, ticket.customerPhone),
+      TicketService.updateTicket(ticket.id, {
+        agentId: isDept ? null : target,
+        status: isDept ? 'open' : 'active',
+        aiCategory: isDept ? target : ticket.aiCategory
+      })
+    ]);
   };
 
   const handleReopen = async (ticket) => {
@@ -132,6 +141,7 @@ export default function AppController() {
               tickets={ticketModel.tickets}
               currentUser={authModel.profile}
               selectedId={selectedTicketId}
+              tags={settingsModel.tags}
               onSelect={(t) => { if (t.status !== 'analyzing') { setSelectedTicketId(t.id); setAiState(p => ({...p, summaryData: null})); }}}
               onCreateTicket={handleCreateTicket}
             />
