@@ -1,0 +1,40 @@
+{
+  "name": "nextalk-desk",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host",
+    "build": "vite build",
+    "preview": "vite preview",
+    "api": "node api-server.js",
+    "api:dev": "node --watch api-server.js",
+    "webhook": "node webhook-server-mongodb.js",
+    "webhook:dev": "node --watch webhook-server-mongodb.js",
+    "webhook:firebase": "node webhook-server.js"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "dotenv": "^16.3.1",
+    "express": "^4.18.2",
+    "firebase": "^10.14.1",
+    "firebase-admin": "^12.0.0",
+    "lucide-react": "^0.303.0",
+    "mongodb": "^6.3.0",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "recharts": "^2.10.3",
+    "redis": "^4.7.0",
+    "socket.io": "^4.8.1",
+    "socket.io-client": "^4.8.1"
+  },
+  "devDependencies": {
+    "@types/react": "^18.2.43",
+    "@types/react-dom": "^18.2.17",
+    "@vitejs/plugin-react": "^4.2.1",
+    "autoprefixer": "^10.4.16",
+    "postcss": "^8.4.32",
+    "tailwindcss": "^3.4.0",
+    "vite": "^5.0.8"
+  }
+}
