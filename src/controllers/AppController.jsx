@@ -3,6 +3,7 @@ import { MessageSquare, BarChart2, LogOut, Settings } from 'lucide-react';
 
 import { useAuthModel } from '../models/hooks/useAuthModel';
 import { useTicketsModel } from '../models/hooks/useTicketsModel';
+import { useSettingsModel } from '../models/hooks/useSettingsModel';
 import { AIService } from '../models/services/AIService';
 import { TicketService } from '../models/services/TicketService.api';
 
@@ -15,6 +16,7 @@ import { ChatWindow } from '../views/partials/ChatWindow';
 export default function AppController() {
   const authModel = useAuthModel();
   const ticketModel = useTicketsModel(authModel.profile);
+  const settingsModel = useSettingsModel();
 
   const [view, setView] = useState('chat');
   const [adminTab, setAdminTab] = useState('connection');
@@ -68,16 +70,17 @@ export default function AppController() {
 
   const handleTransfer = async (ticket, target) => {
     if (!ticket) return;
-    const isDept = ['Financeiro', 'Suporte', 'Vendas'].includes(target);
+    // Verifica se o target é um departamento (comparando com a lista de departamentos do banco)
+    const isDept = settingsModel.departments.some(d => d.name === target);
     await TicketService.sendMessage(ticket.id, ticket.messages, {
       text: `Ticket transferido para ${target}`,
       sender: 'system',
       agentName: 'System'
     }, ticket.customerPhone);
     await TicketService.updateTicket(ticket.id, {
-      agentId: isDept ? null : target, 
-      status: isDept ? 'open' : 'active', 
-      aiCategory: isDept ? target : ticket.aiCategory 
+      agentId: isDept ? null : target,
+      status: isDept ? 'open' : 'active',
+      aiCategory: isDept ? target : ticket.aiCategory
     });
     if (target !== authModel.profile.name) setSelectedTicketId(null);
   };
@@ -135,6 +138,10 @@ export default function AppController() {
             <ChatWindow
               ticket={selectedTicket}
               currentUser={authModel.profile}
+              departments={settingsModel.departments}
+              users={settingsModel.users}
+              tags={settingsModel.tags}
+              reasons={settingsModel.reasons}
               onSend={(txt) => TicketService.sendMessage(selectedTicket.id, selectedTicket.messages, { text: txt, sender: 'agent', agentName: authModel.profile.name }, selectedTicket.customerPhone)}
               onTransfer={handleTransfer}
               onReopen={handleReopen}

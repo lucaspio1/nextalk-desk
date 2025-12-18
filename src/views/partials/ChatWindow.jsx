@@ -16,7 +16,7 @@ const ChatHeaderAction = ({ icon: Icon, label, active, onClick, dropdown }) => (
   </div>
 );
 
-export const ChatWindow = ({ ticket, currentUser, onSend, onClose, onPick, onTransfer, onReopen, onUpdate, aiActions }) => {
+export const ChatWindow = ({ ticket, currentUser, departments = [], users = [], tags = [], reasons = [], onSend, onClose, onPick, onTransfer, onReopen, onUpdate, aiActions }) => {
   const [input, setInput] = useState("");
   const [notes, setNotes] = useState("");
   const [saveStatus, setSaveStatus] = useState("saved"); // 'saved', 'saving', 'typing'
@@ -88,28 +88,57 @@ export const ChatWindow = ({ ticket, currentUser, onSend, onClose, onPick, onTra
                <ChatHeaderAction icon={ArrowRightLeft} label="Transferir" active={activePopover === 'transfer'} onClick={() => setActivePopover(activePopover === 'transfer' ? null : 'transfer')} 
                  dropdown={
                    <div className="w-64 p-3 bg-white">
-                     <div className="text-xs font-bold text-gray-400 mb-2 uppercase">Departamentos</div>
-                     {['Financeiro', 'Suporte', 'Vendas'].map(d => (
-                       <button key={d} onClick={() => { onTransfer(ticket, d); setActivePopover(null); }} className="w-full text-left p-2 hover:bg-emerald-50 text-sm text-gray-700 rounded flex items-center gap-2">
-                         <Users size={14} className="text-gray-400"/> {d}
-                       </button>
-                     ))}
-                     <div className="h-px bg-gray-100 my-2"></div>
+                     {departments.length > 0 && (
+                       <>
+                         <div className="text-xs font-bold text-gray-400 mb-2 uppercase">Departamentos</div>
+                         {departments.map(d => (
+                           <button key={d.id} onClick={() => { onTransfer(ticket, d.name); setActivePopover(null); }} className="w-full text-left p-2 hover:bg-emerald-50 text-sm text-gray-700 rounded flex items-center gap-2">
+                             <Users size={14} className="text-gray-400"/> {d.name}
+                           </button>
+                         ))}
+                         <div className="h-px bg-gray-100 my-2"></div>
+                       </>
+                     )}
                      <div className="text-xs font-bold text-gray-400 mb-2 uppercase">Agentes</div>
-                     {['Atendente 1', 'Atendente 2'].map(a => (
-                       <button key={a} onClick={() => { onTransfer(ticket, a); setActivePopover(null); }} className="w-full text-left p-2 hover:bg-emerald-50 text-sm text-gray-700 rounded flex items-center gap-2">
-                         <User size={14} className="text-gray-400"/> {a}
+                     {users.length > 0 ? users.filter(u => u.role === 'agent').map(a => (
+                       <button key={a.id} onClick={() => { onTransfer(ticket, a.name); setActivePopover(null); }} className="w-full text-left p-2 hover:bg-emerald-50 text-sm text-gray-700 rounded flex items-center gap-2">
+                         <User size={14} className="text-gray-400"/> {a.name}
                        </button>
-                     ))}
+                     )) : (
+                       <div className="text-xs text-gray-400 p-2">Nenhum agente disponível</div>
+                     )}
                    </div>
                  } 
                />
              )}
-             <ChatHeaderAction icon={Tag} label="Etiquetas" active={activePopover === 'tags'} onClick={() => setActivePopover(activePopover === 'tags' ? null : 'tags')} dropdown={<div className="p-3 text-xs">Sem etiquetas disponíveis</div>} />
+             <ChatHeaderAction icon={Tag} label="Etiquetas" active={activePopover === 'tags'} onClick={() => setActivePopover(activePopover === 'tags' ? null : 'tags')} dropdown={
+              <div className="p-3">
+                {tags.length > 0 ? (
+                  <div className="space-y-1">
+                    {tags.map(t => (
+                      <button key={t.id} className="w-full text-left p-2 hover:bg-gray-50 text-sm text-gray-700 rounded flex items-center gap-2">
+                        <div className="w-3 h-3 rounded-full" style={{ backgroundColor: t.color }}></div>
+                        {t.name}
+                      </button>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-xs text-gray-400">Sem etiquetas disponíveis</div>
+                )}
+              </div>
+            } />
              {ticket.status !== 'closed' && (
                 <ChatHeaderAction icon={CheckCircle} label="Finalizar" active={activePopover === 'finish'} onClick={() => setActivePopover(activePopover === 'finish' ? null : 'finish')} dropdown={
                   <div className="p-1">
-                    {['Resolvido', 'Dúvida', 'Engano'].map(r => <button key={r} onClick={() => { onClose(); setActivePopover(null); }} className="w-full text-left p-2 hover:bg-gray-50 text-sm text-gray-700 rounded">{r}</button>)}
+                    {reasons.length > 0 ? reasons.map(r => (
+                      <button key={r.id} onClick={() => { onClose(); setActivePopover(null); }} className="w-full text-left p-2 hover:bg-gray-50 text-sm text-gray-700 rounded">
+                        {r.name}
+                      </button>
+                    )) : (
+                      <button onClick={() => { onClose(); setActivePopover(null); }} className="w-full text-left p-2 hover:bg-gray-50 text-sm text-gray-700 rounded">
+                        Finalizar sem motivo
+                      </button>
+                    )}
                   </div>
                 } />
              )}
