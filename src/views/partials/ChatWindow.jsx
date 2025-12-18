@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Monitor, User, ArrowRightLeft, Users, Tag, CheckCircle, X, Zap, Send, RotateCcw, StickyNote, FileText, Loader2, Check } from 'lucide-react';
+import { Monitor, User, ArrowRightLeft, Users, Tag, CheckCircle, X, Zap, Send, RotateCcw, StickyNote, FileText, Loader2, Check, Sparkles } from 'lucide-react';
 import { Button } from '../components/UIComponents';
 
 const ChatHeaderAction = ({ icon: Icon, label, active, onClick, dropdown }) => (
