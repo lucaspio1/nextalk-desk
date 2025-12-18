@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Monitor, User, ArrowRightLeft, Users, Tag, CheckCircle, X, Sparkles, Send, RotateCcw, StickyNote, FileText, Loader2, Check } from 'lucide-react';
+import { Monitor, User, ArrowRightLeft, Users, Tag, CheckCircle, X, Zap, Send, RotateCcw, StickyNote, FileText, Loader2, Check } from 'lucide-react';
 import { Button } from '../components/UIComponents';
 
 const ChatHeaderAction = ({ icon: Icon, label, active, onClick, dropdown }) => (
@@ -16,7 +16,7 @@ const ChatHeaderAction = ({ icon: Icon, label, active, onClick, dropdown }) => (
   </div>
 );
 
-export const ChatWindow = ({ ticket, currentUser, departments = [], users = [], tags = [], reasons = [], onSend, onClose, onPick, onTransfer, onReopen, onUpdate, aiActions }) => {
+export const ChatWindow = ({ ticket, currentUser, departments = [], users = [], tags = [], reasons = [], quickResponses = [], onSend, onClose, onPick, onTransfer, onReopen, onUpdate, aiActions }) => {
   const [input, setInput] = useState("");
   const [notes, setNotes] = useState("");
   const [saveStatus, setSaveStatus] = useState("saved"); // 'saved', 'saving', 'typing'
@@ -59,7 +59,29 @@ export const ChatWindow = ({ ticket, currentUser, departments = [], users = [], 
       return () => clearTimeout(timer);
   }, [notes]);
 
-  const handleSend = () => { if(input.trim()) { onSend(input); setInput(""); } };
+  const handleSend = () => {
+    if(input.trim()) {
+      onSend(input);
+      setInput("");
+    }
+  };
+
+  const handleApplyTag = async (tagId, tagName) => {
+    if (!ticket || !onUpdate) return;
+
+    // Optimistic update - atualiza UI imediatamente
+    const currentTags = ticket.tags || [];
+    const hasTag = currentTags.some(t => t.id === tagId || t === tagName);
+
+    if (!hasTag) {
+      // Adiciona a tag
+      await onUpdate(ticket.id, {
+        tags: [...currentTags, { id: tagId, name: tagName }]
+      });
+    }
+
+    setActivePopover(null);
+  };
   
   if (!ticket) return (
     <div className="flex-1 flex flex-col items-center justify-center text-gray-400 bg-[#f0f2f5] h-full">
@@ -80,6 +102,27 @@ export const ChatWindow = ({ ticket, currentUser, departments = [], users = [], 
               <h3 className="font-bold text-gray-800 flex items-center gap-2 text-sm">{ticket.customerName}</h3>
               <div className="text-xs text-gray-500 flex items-center gap-1">
                 <span>{ticket.status === 'open' ? 'Aguardando' : ticket.status === 'closed' ? 'Finalizado' : 'Em atendimento'}</span>
+                {ticket.tags && ticket.tags.length > 0 && (
+                  <div className="flex gap-1 ml-2">
+                    {ticket.tags.slice(0, 3).map((tag, idx) => {
+                      const tagData = tags.find(t => t.id === tag.id || t.name === tag.name || t.name === tag);
+                      if (!tagData) return null;
+                      return (
+                        <div
+                          key={idx}
+                          className="px-2 py-0.5 rounded-full text-[10px] font-medium"
+                          style={{
+                            backgroundColor: tagData.color + '20',
+                            color: tagData.color,
+                            border: `1px solid ${tagData.color}40`
+                          }}
+                        >
+                          {tagData.name}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -116,7 +159,11 @@ export const ChatWindow = ({ ticket, currentUser, departments = [], users = [], 
                 {tags.length > 0 ? (
                   <div className="space-y-1">
                     {tags.map(t => (
-                      <button key={t.id} className="w-full text-left p-2 hover:bg-gray-50 text-sm text-gray-700 rounded flex items-center gap-2">
+                      <button
+                        key={t.id}
+                        onClick={() => handleApplyTag(t.id, t.name)}
+                        className="w-full text-left p-2 hover:bg-emerald-50 text-sm text-gray-700 rounded flex items-center gap-2 transition-colors"
+                      >
                         <div className="w-3 h-3 rounded-full" style={{ backgroundColor: t.color }}></div>
                         {t.name}
                       </button>
@@ -170,8 +217,49 @@ export const ChatWindow = ({ ticket, currentUser, departments = [], users = [], 
         {ticket.status === 'active' && ticket.agentId === currentUser.name ? (
           <div className="bg-[#f0f2f5] p-3 px-4 z-10 shrink-0 flex gap-2 items-end">
              <div className="flex-1 bg-white rounded-lg border border-white flex items-center px-4 py-2 focus-within:ring-1 focus-within:ring-white transition-all shadow-sm">
-                <input type="text" value={input} onChange={e => setInput(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleSend()} placeholder="Mensagem" className="flex-1 bg-transparent outline-none text-sm py-1" />
-                <button onClick={() => aiActions.onSmartReply(ticket, setInput)} className="text-emerald-600 hover:bg-emerald-50 p-1 rounded" title="Sugestão IA"><Sparkles size={16}/></button>
+                <div className="relative">
+                  <button
+                    onClick={() => setActivePopover(activePopover === 'quickReplies' ? null : 'quickReplies')}
+                    className="text-gray-400 hover:text-emerald-600 hover:bg-emerald-50 p-1 rounded transition-colors"
+                    title="Respostas Rápidas"
+                  >
+                    <Zap size={18}/>
+                  </button>
+                  {activePopover === 'quickReplies' && (
+                    <div className="absolute bottom-full left-0 mb-2 w-80 bg-white rounded-lg shadow-xl border border-gray-100 z-50 animate-in fade-in zoom-in-95 duration-200 origin-bottom-left max-h-96 overflow-y-auto">
+                      <div className="p-2">
+                        <div className="text-xs font-bold text-gray-400 mb-2 px-2 uppercase">Respostas Rápidas</div>
+                        {quickResponses.length > 0 ? (
+                          <div className="space-y-1">
+                            {quickResponses.map(qr => (
+                              <button
+                                key={qr.id}
+                                onClick={() => {
+                                  setInput(qr.description);
+                                  setActivePopover(null);
+                                }}
+                                className="w-full text-left p-2 hover:bg-emerald-50 rounded transition-colors"
+                              >
+                                <div className="font-medium text-sm text-gray-700">{qr.title}</div>
+                                <div className="text-xs text-gray-500 mt-1 line-clamp-2">{qr.description}</div>
+                              </button>
+                            ))}
+                          </div>
+                        ) : (
+                          <div className="text-xs text-gray-400 p-2">Nenhuma resposta rápida disponível</div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+                <input
+                  type="text"
+                  value={input}
+                  onChange={e => setInput(e.target.value)}
+                  onKeyDown={e => e.key === 'Enter' && handleSend()}
+                  placeholder="Mensagem"
+                  className="flex-1 bg-transparent outline-none text-sm py-1 px-2"
+                />
              </div>
              <button onClick={handleSend} className="p-3 bg-emerald-500 text-white rounded-full hover:bg-emerald-600 transition-colors shadow-sm"><Send size={20}/></button>
           </div>

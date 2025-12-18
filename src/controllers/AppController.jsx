@@ -142,6 +142,7 @@ export default function AppController() {
               users={settingsModel.users}
               tags={settingsModel.tags}
               reasons={settingsModel.reasons}
+              quickResponses={settingsModel.quickResponses}
               onSend={(txt) => TicketService.sendMessage(selectedTicket.id, selectedTicket.messages, { text: txt, sender: 'agent', agentName: authModel.profile.name }, selectedTicket.customerPhone)}
               onTransfer={handleTransfer}
               onReopen={handleReopen}

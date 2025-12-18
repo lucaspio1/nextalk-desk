@@ -158,7 +158,7 @@ export const TicketService = {
       callback(sortedTickets);
     });
 
-    // Socket.io listener (pooling fallback)
+    // Socket.io listener (pooling fallback) - Reduzido para 2s para melhor UX
     const interval = setInterval(async () => {
       const tickets = await this.getAllTickets();
       const sortedTickets = tickets.sort((a, b) => {
@@ -167,7 +167,7 @@ export const TicketService = {
         return dateB - dateA;
       });
       callback(sortedTickets);
-    }, 5000);
+    }, 2000);
 
     // Retorna função para cancelar
     return () => {
