@@ -42,6 +42,10 @@ const WHATSAPP_TOKEN = process.env.VITE_WHATSAPP_ACCESS_TOKEN;
 const PHONE_NUMBER_ID = process.env.VITE_WHATSAPP_PHONE_NUMBER_ID;
 const WHATSAPP_API_VERSION = process.env.VITE_WHATSAPP_API_VERSION || 'v24.0';
 
+// Configuração do Microsserviço Pagamento
+const PAYMENT_SERVICE_URL = process.env.PAYMENT_SERVICE_URL || 'http://172.18.0.8:4001';
+const INTERNAL_SECRET = process.env.INTERNAL_SERVICE_SECRET || 'nextalk_segredo_interno_super_seguro_2025';
+
 let mongoClient = null;
 let db = null;
 let redisClient = null;
@@ -565,6 +569,38 @@ app.put('/api/settings/general', async (req, res) => {
     res.json({ success: true });
   } catch (error) {
     res.status(500).json({ error: 'Erro ao atualizar configurações' });
+  }
+});
+
+// Rota Proxy: Frontend -> Backend (4000) -> Payment Service (4001) -> Asaas
+app.post('/api/asaas/create-payment', async (req, res) => {
+  try {
+    console.log('🔄 Proxy: Iniciando pagamento via serviço seguro...');
+    
+    // Repassa a requisição para o serviço seguro (porta 4001)
+    const response = await fetch(`${PAYMENT_SERVICE_URL}/api/create`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-internal-secret': INTERNAL_SECRET // Autenticação entre seus serviços
+      },
+      body: JSON.stringify(req.body)
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      console.error('❌ Erro no serviço de pagamento:', data);
+      return res.status(response.status).json({ error: data.error || 'Erro no processamento do pagamento' });
+    }
+
+    console.log('✅ Pagamento gerado com sucesso pelo serviço seguro.');
+    res.json(data);
+
+  } catch (error) {
+    console.error('🚨 Erro crítico na rota proxy de pagamento:', error);
+    // Retorna erro amigável para não quebrar o frontend
+    res.status(500).json({ error: 'Serviço de pagamento indisponível no momento.' });
   }
 });
 

@@ -1,9 +1,18 @@
 import React, { useState, useEffect } from 'react';
-import { MessageSquare, Sliders, Zap, Users, User, CheckSquare, Tag, CheckCircle, Clock, Bot, Brain, LayoutGrid, Code, CreditCard, UserCog, PlusCircle, Settings, QrCode, Smartphone, Wifi, Facebook, Trash2, Edit2, X, Save } from 'lucide-react';
+// Importação UNIFICADA e CORRIGIDA dos ícones
+import { 
+  MessageSquare, Sliders, Zap, Users, User, CheckSquare, Tag, CheckCircle, 
+  Clock, Bot, Brain, LayoutGrid, Code, CreditCard, UserCog, PlusCircle, 
+  Settings, QrCode, Smartphone, Wifi, Facebook, Trash2, Edit2, X, Save, 
+  AlertTriangle 
+} from 'lucide-react';
+
 import { Button, ToggleSwitch, SectionHeader, AdminTable } from '../components/UIComponents';
 import { WhatsAppService } from '../../models/services/WhatsAppService';
 import { SettingsService } from '../../models/services/SettingsService.api';
+import { PaymentService } from '../../models/services/PaymentService.api';
 
+// --- SUB-COMPONENTE: SIDEBAR ---
 const AdminSidebar = ({ activeTab, onTabChange }) => {
   const items = [
     { id: 'connection', icon: Smartphone, label: 'Conexão' },
@@ -22,10 +31,7 @@ const AdminSidebar = ({ activeTab, onTabChange }) => {
 
   return (
     <div className="w-64 bg-[#f8f9fa] border-r border-gray-200 flex flex-col h-full overflow-y-auto shrink-0">
-      {/* Card do chatPro REMOVIDO aqui */}
-      <div className="p-4">
-         {/* Espaço vazio ou outro conteúdo futuro */}
-      </div>
+      <div className="p-4"></div>
       <nav className="flex-1 px-2 space-y-0.5">
         {items.map(item => (
           <button
@@ -42,9 +48,243 @@ const AdminSidebar = ({ activeTab, onTabChange }) => {
   );
 };
 
-// ... Restante do código AdminContent permanece igual ...
+// --- SUB-COMPONENTE: PAINEL DE ASSINATURA SAAS (CORRIGIDO) ---
+const PaymentPanel = () => {
+  // Adicionados campos de email e telefone
+  const [payerForm, setPayerForm] = useState({
+    name: '', 
+    cpfCnpj: '', 
+    email: '',
+    mobilePhone: '',
+    billingType: 'PIX'
+  });
+  
+  const [paymentResult, setPaymentResult] = useState(null);
+  const [payLoading, setPayLoading] = useState(false);
+  const [payError, setPayError] = useState('');
+
+  const handleSubscribe = async (e) => {
+    e.preventDefault();
+    setPayLoading(true);
+    setPayError('');
+    setPaymentResult(null);
+
+    try {
+      // Validação dos novos campos
+      if (!payerForm.cpfCnpj || !payerForm.name || !payerForm.email || !payerForm.mobilePhone) {
+        throw new Error('Por favor, preencha todos os campos (Nome, CPF/CNPJ, Email e Telefone).');
+      }
+
+      // Limpeza do telefone (apenas números)
+      const cleanPhone = payerForm.mobilePhone.replace(/\D/g, '');
+      if (cleanPhone.length < 10) {
+        throw new Error('Telefone inválido. Digite DDD + Número.');
+      }
+
+      const SUBSCRIPTION_VALUE = 5.00;
+      const SUBSCRIPTION_DESC = 'Assinatura Mensal - Nextalk Desk (SaaS)';
+
+      const tomorrow = new Date();
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      const dueDate = tomorrow.toISOString().split('T')[0];
+
+      const payload = {
+        customer: {
+          name: payerForm.name,
+          cpfCnpj: payerForm.cpfCnpj.replace(/\D/g, ''),
+          mobilePhone: cleanPhone, // Agora usa o telefone digitado
+          email: payerForm.email   // Agora usa o email digitado
+        },
+        payment: {
+          billingType: payerForm.billingType,
+          value: SUBSCRIPTION_VALUE,
+          description: SUBSCRIPTION_DESC,
+          dueDate: dueDate
+        }
+      };
+
+      const result = await PaymentService.createPayment(payload);
+      setPaymentResult(result);
+      
+    } catch (error) {
+      console.error('Erro ao processar assinatura:', error);
+      setPayError(error.message || 'Erro ao comunicar com o servidor de pagamento.');
+    } finally {
+      setPayLoading(false);
+    }
+  };
+
+  return (
+    <div className="max-w-4xl space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-500">
+      <div className="flex items-center justify-between">
+          <div>
+             <h2 className="text-2xl font-bold tracking-tight text-gray-800">Minha Assinatura</h2>
+             <p className="text-muted-foreground">Gerencie o pagamento da sua licença de uso.</p>
+          </div>
+          <div className="bg-blue-50 text-blue-700 px-4 py-2 rounded-lg font-bold text-sm border border-blue-100">
+             Plano Atual: PRO (Teste)
+          </div>
+      </div>
+      
+      {payError && (
+        <div className="bg-red-50 text-red-600 p-4 rounded border border-red-200 flex items-center gap-2">
+           <AlertTriangle size={20} />
+           <span>{payError}</span>
+        </div>
+      )}
+
+      <div className="grid md:grid-cols-2 gap-8">
+        {/* Card do Formulário */}
+        <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+           <div className="bg-gray-50 p-6 border-b border-gray-100">
+              <h3 className="text-lg font-bold text-gray-800">Dados de Faturamento</h3>
+           </div>
+           <div className="p-6">
+              {!paymentResult ? (
+                <form onSubmit={handleSubscribe} className="space-y-4">
+                  <div className="space-y-3">
+                    <label className="text-xs font-bold text-gray-500 uppercase">Informações Pessoais</label>
+                    <input 
+                      required 
+                      className="w-full p-2.5 bg-gray-50 border border-gray-200 rounded text-sm outline-none focus:ring-2 focus:ring-emerald-500 transition-all" 
+                      value={payerForm.name} 
+                      onChange={e => setPayerForm({...payerForm, name: e.target.value})} 
+                      placeholder="Nome Completo ou Razão Social" 
+                    />
+                    <input 
+                      required 
+                      className="w-full p-2.5 bg-gray-50 border border-gray-200 rounded text-sm outline-none focus:ring-2 focus:ring-emerald-500 transition-all" 
+                      value={payerForm.cpfCnpj} 
+                      onChange={e => setPayerForm({...payerForm, cpfCnpj: e.target.value})} 
+                      placeholder="CPF ou CNPJ" 
+                    />
+                  </div>
+
+                  <div className="space-y-3">
+                    <label className="text-xs font-bold text-gray-500 uppercase">Contato</label>
+                    <input 
+                      required 
+                      type="email"
+                      className="w-full p-2.5 bg-gray-50 border border-gray-200 rounded text-sm outline-none focus:ring-2 focus:ring-emerald-500 transition-all" 
+                      value={payerForm.email} 
+                      onChange={e => setPayerForm({...payerForm, email: e.target.value})} 
+                      placeholder="seu@email.com" 
+                    />
+                    <input 
+                      required 
+                      type="tel"
+                      className="w-full p-2.5 bg-gray-50 border border-gray-200 rounded text-sm outline-none focus:ring-2 focus:ring-emerald-500 transition-all" 
+                      value={payerForm.mobilePhone} 
+                      onChange={e => setPayerForm({...payerForm, mobilePhone: e.target.value})} 
+                      placeholder="WhatsApp (ex: 11999998888)" 
+                    />
+                  </div>
+
+                  <div className="space-y-2 pt-2">
+                    <label className="text-xs font-bold text-gray-500 uppercase">Forma de Pagamento</label>
+                    <div className="grid grid-cols-2 gap-2">
+                       <button
+                         type="button"
+                         onClick={() => setPayerForm({...payerForm, billingType: 'PIX'})}
+                         className={`p-3 rounded border text-sm font-medium flex items-center justify-center gap-2 ${payerForm.billingType === 'PIX' ? 'border-emerald-500 bg-emerald-50 text-emerald-700' : 'border-gray-200 hover:bg-gray-50'}`}
+                       >
+                         <QrCode size={16}/> Pix
+                       </button>
+                       <button
+                         type="button"
+                         onClick={() => setPayerForm({...payerForm, billingType: 'BOLETO'})}
+                         className={`p-3 rounded border text-sm font-medium flex items-center justify-center gap-2 ${payerForm.billingType === 'BOLETO' ? 'border-emerald-500 bg-emerald-50 text-emerald-700' : 'border-gray-200 hover:bg-gray-50'}`}
+                       >
+                         <CreditCard size={16}/> Boleto
+                       </button>
+                    </div>
+                  </div>
+
+                  <div className="border-t border-dashed border-gray-200 pt-4 mt-4 flex justify-between items-center">
+                     <span className="font-bold text-gray-800">Total</span>
+                     <span className="font-bold text-xl text-emerald-600">R$ 5,00</span>
+                  </div>
+
+                  <button 
+                    type="submit" 
+                    disabled={payLoading} 
+                    className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 px-4 rounded-lg shadow-sm hover:shadow-md transition-all disabled:opacity-50 disabled:cursor-not-allowed mt-2"
+                  >
+                    {payLoading ? 'Processando...' : 'Confirmar Assinatura'}
+                  </button>
+                </form>
+              ) : (
+                <div className="text-center py-10 text-gray-500 text-sm">
+                   <div className="text-emerald-600 font-bold mb-2">Pedido Recebido!</div>
+                   Veja os detalhes do pagamento ao lado.
+                   <button onClick={() => setPaymentResult(null)} className="block mx-auto mt-4 text-blue-600 hover:underline border border-blue-200 px-4 py-2 rounded">Nova Cobrança</button>
+                </div>
+              )}
+           </div>
+        </div>
+
+        {/* Área de Resultado / Feedback */}
+        <div className="bg-gray-50 rounded-xl border border-gray-200 p-6 flex flex-col justify-center items-center min-h-[400px]">
+           {!paymentResult ? (
+             <div className="text-center max-w-xs">
+               <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center mb-4 shadow-sm mx-auto">
+                 <CreditCard size={32} className="text-gray-300" />
+               </div>
+               <h4 className="font-bold text-gray-700 mb-1">Resumo do Pedido</h4>
+               <p className="text-sm text-gray-400">Preencha seus dados ao lado para gerar o pagamento da licença.</p>
+             </div>
+           ) : (
+             <div className="w-full space-y-6 animate-in zoom-in duration-300">
+               <div className="text-center">
+                 <div className="w-16 h-16 bg-emerald-100 rounded-full flex items-center justify-center mb-4 shadow-sm mx-auto text-emerald-600">
+                   <CheckCircle size={32} />
+                 </div>
+                 <h4 className="font-bold text-emerald-800 text-lg">Cobrança Gerada!</h4>
+                 <p className="text-sm text-emerald-600">Realize o pagamento para confirmar.</p>
+               </div>
+               
+               {/* QR Code Pix */}
+               {paymentResult?.pix?.encodedImage && (
+                 <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm text-center">
+                   <p className="text-xs font-bold text-gray-500 uppercase mb-3">Escaneie o QR Code</p>
+                   <img 
+                      src={`data:image/jpeg;base64,${paymentResult.pix.encodedImage}`} 
+                      alt="QR Code Pix" 
+                      className="mx-auto w-48 h-48 mb-4 object-contain"
+                   />
+                   <div className="text-left bg-gray-50 p-3 rounded border border-gray-100">
+                     <p className="text-[10px] text-gray-400 uppercase mb-1 font-bold">Pix Copia e Cola</p>
+                     <div className="text-[10px] break-all font-mono text-gray-600 select-all cursor-text">
+                       {paymentResult.pix.payload}
+                     </div>
+                   </div>
+                 </div>
+               )}
+
+               {/* Botão Boleto */}
+               {paymentResult?.payment?.invoiceUrl && (
+                 <a 
+                    href={paymentResult.payment.invoiceUrl} 
+                    target="_blank" 
+                    rel="noreferrer" 
+                    className="flex items-center justify-center w-full bg-blue-600 text-white py-4 rounded-xl shadow hover:bg-blue-700 transition-colors font-bold gap-2"
+                 >
+                    <CreditCard size={20}/>
+                    Abrir Boleto / Fatura
+                 </a>
+               )}
+             </div>
+           )}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+
+// --- COMPONENTE PRINCIPAL DE CONTEÚDO ---
 const AdminContent = ({ activeTab }) => {
-    // ... (mesmo conteúdo anterior)
+    // Hooks globais do AdminContent (Mantidos no topo, como exige o React)
     const [status, setStatus] = useState('DISCONNECTED');
     const [isLoading, setIsLoading] = useState(false);
 
@@ -98,7 +338,7 @@ const AdminContent = ({ activeTab }) => {
     const [reasonForm, setReasonForm] = useState({ name: '', description: '' });
     const [reasonSearch, setReasonSearch] = useState('');
 
-    // Load data on mount
+    // Efeitos (Carregamento de dados)
     useEffect(() => {
         if (activeTab === 'connection') {
             WhatsAppService.getStatus().then(s => setStatus(s.state));
@@ -119,7 +359,7 @@ const AdminContent = ({ activeTab }) => {
         }
     }, [activeTab]);
 
-    // Ajustes Gerais Functions
+    // --- Funções de Manipulação (Ajustes Gerais) ---
     const loadGeneralSettings = async () => {
         const settings = await SettingsService.getGeneralSettings();
         if (settings) setGeneralSettings(settings);
@@ -131,7 +371,7 @@ const AdminContent = ({ activeTab }) => {
         await SettingsService.updateGeneralSettings(newSettings);
     };
 
-    // Respostas Rápidas Functions
+    // --- Funções de Manipulação (Respostas Rápidas) ---
     const loadQuickResponses = async () => {
         const responses = await SettingsService.getQuickResponses();
         setQuickResponses(responses);
@@ -162,7 +402,7 @@ const AdminContent = ({ activeTab }) => {
         setShowQuickModal(true);
     };
 
-    // Departamentos Functions
+    // --- Funções de Manipulação (Departamentos) ---
     const loadDepartments = async () => {
         const depts = await SettingsService.getDepartments();
         setDepartments(depts);
@@ -193,7 +433,7 @@ const AdminContent = ({ activeTab }) => {
         setShowDeptModal(true);
     };
 
-    // Usuários Functions
+    // --- Funções de Manipulação (Usuários) ---
     const loadUsers = async () => {
         const usersList = await SettingsService.getUsers();
         setUsers(usersList);
@@ -224,7 +464,7 @@ const AdminContent = ({ activeTab }) => {
         setShowUserModal(true);
     };
 
-    // Contatos Functions
+    // --- Funções de Manipulação (Contatos) ---
     const loadContacts = async () => {
         const contactsList = await SettingsService.getContacts();
         setContacts(contactsList);
@@ -255,7 +495,7 @@ const AdminContent = ({ activeTab }) => {
         setShowContactModal(true);
     };
 
-    // Etiquetas Functions
+    // --- Funções de Manipulação (Etiquetas) ---
     const loadTags = async () => {
         const tagsList = await SettingsService.getTags();
         setTags(tagsList);
@@ -286,7 +526,7 @@ const AdminContent = ({ activeTab }) => {
         setShowTagModal(true);
     };
 
-    // Motivos de Finalização Functions
+    // --- Funções de Manipulação (Motivos) ---
     const loadReasons = async () => {
         const reasonsList = await SettingsService.getReasons();
         setReasons(reasonsList);
@@ -330,6 +570,7 @@ const AdminContent = ({ activeTab }) => {
         }
     };
 
+    // Filtros
     const filteredQuickResponses = quickResponses.filter(r =>
         r.title?.toLowerCase().includes(quickSearch.toLowerCase()) ||
         r.description?.toLowerCase().includes(quickSearch.toLowerCase())
@@ -358,6 +599,7 @@ const AdminContent = ({ activeTab }) => {
         r.name?.toLowerCase().includes(reasonSearch.toLowerCase())
     );
 
+    // --- RENDERIZAÇÃO DO CONTEÚDO ---
     switch(activeTab) {
       case 'connection':
         return (
@@ -478,7 +720,7 @@ const AdminContent = ({ activeTab }) => {
                <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
                  <div className="bg-white rounded-lg shadow-xl w-full max-w-md">
                    <div className="px-4 py-3 border-b border-gray-100 flex justify-between items-center">
-                     <h3 className="font-bold text-gray-700">{editingQuick ? 'Editar' : 'Nova'} Resposta Rápida</h3>
+                     <h3 className="font-bold text-gray-700">{editingQuick ? 'Editar' : 'Novo'} Resposta Rápida</h3>
                      <button onClick={() => setShowQuickModal(false)} className="text-gray-400 hover:text-gray-600"><X size={18} /></button>
                    </div>
                    <div className="p-4 space-y-3">
@@ -930,6 +1172,11 @@ const AdminContent = ({ activeTab }) => {
              </div>
           </div>
          );
+      
+      // CASO DE PAGAMENTO CORRIGIDO: Usa o componente PaymentPanel
+      case 'payment':
+        return <PaymentPanel />;
+
       default:
         return (
           <div className="flex items-center justify-center h-full text-gray-400">
