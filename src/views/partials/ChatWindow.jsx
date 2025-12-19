@@ -21,11 +21,27 @@ export const ChatWindow = ({ ticket, currentUser, departments = [], users = [], 
   const [notes, setNotes] = useState("");
   const [saveStatus, setSaveStatus] = useState("saved"); // 'saved', 'saving', 'typing'
   const [activePopover, setActivePopover] = useState(null);
+  const [shouldAutoScroll, setShouldAutoScroll] = useState(true);
   const messagesEndRef = useRef(null);
+  const messagesContainerRef = useRef(null);
 
-  useEffect(() => { 
-      messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }); 
-  }, [ticket?.messages]);
+  // Smart scroll: only auto-scroll if user is at the bottom
+  const checkIfAtBottom = () => {
+    if (!messagesContainerRef.current) return true;
+    const { scrollTop, scrollHeight, clientHeight } = messagesContainerRef.current;
+    const threshold = 100; // pixels from bottom
+    return scrollHeight - scrollTop - clientHeight < threshold;
+  };
+
+  const handleScroll = () => {
+    setShouldAutoScroll(checkIfAtBottom());
+  };
+
+  useEffect(() => {
+      if (shouldAutoScroll) {
+        messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+      }
+  }, [ticket?.messages, shouldAutoScroll]);
 
   // Carrega as notas apenas quando muda o ID do ticket (evita sobrescrever enquanto digita)
   useEffect(() => {
@@ -69,12 +85,15 @@ export const ChatWindow = ({ ticket, currentUser, departments = [], users = [], 
   const handleApplyTag = async (tagId, tagName) => {
     if (!ticket || !onUpdate) return;
 
-    // Optimistic update - atualiza UI imediatamente
     const currentTags = ticket.tags || [];
-    const hasTag = currentTags.some(t => t.id === tagId || t === tagName);
+    const hasTag = currentTags.some(t => t.id === tagId || t === tagName || t.name === tagName);
 
-    if (!hasTag) {
-      // Adiciona a tag
+    if (hasTag) {
+      // Remove a tag se já estiver aplicada (toggle off)
+      const newTags = currentTags.filter(t => t.id !== tagId && t !== tagName && t.name !== tagName);
+      await onUpdate(ticket.id, { tags: newTags });
+    } else {
+      // Adiciona a tag (toggle on)
       await onUpdate(ticket.id, {
         tags: [...currentTags, { id: tagId, name: tagName }]
       });
@@ -158,16 +177,26 @@ export const ChatWindow = ({ ticket, currentUser, departments = [], users = [], 
               <div className="p-3">
                 {tags.length > 0 ? (
                   <div className="space-y-1">
-                    {tags.map(t => (
-                      <button
-                        key={t.id}
-                        onClick={() => handleApplyTag(t.id, t.name)}
-                        className="w-full text-left p-2 hover:bg-emerald-50 text-sm text-gray-700 rounded flex items-center gap-2 transition-colors"
-                      >
-                        <div className="w-3 h-3 rounded-full" style={{ backgroundColor: t.color }}></div>
-                        {t.name}
-                      </button>
-                    ))}
+                    {tags.map(t => {
+                      const currentTags = ticket.tags || [];
+                      const isApplied = currentTags.some(tag => tag.id === t.id || tag === t.name || tag.name === t.name);
+
+                      return (
+                        <button
+                          key={t.id}
+                          onClick={() => handleApplyTag(t.id, t.name)}
+                          className={`w-full text-left p-2 text-sm rounded flex items-center gap-2 transition-colors ${
+                            isApplied
+                              ? 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
+                              : 'text-gray-700 hover:bg-gray-50'
+                          }`}
+                        >
+                          <div className="w-3 h-3 rounded-full" style={{ backgroundColor: t.color }}></div>
+                          <span className="flex-1">{t.name}</span>
+                          {isApplied && <span className="text-[10px] font-bold text-emerald-600">✓ Aplicada</span>}
+                        </button>
+                      );
+                    })}
                   </div>
                 ) : (
                   <div className="text-xs text-gray-400">Sem etiquetas disponíveis</div>
@@ -193,7 +222,11 @@ export const ChatWindow = ({ ticket, currentUser, departments = [], users = [], 
         </div>
 
         {/* MESSAGES */}
-        <div className="flex-1 overflow-y-auto p-4 lg:p-8 space-y-6 z-10 relative bg-[#efe7dd] bg-opacity-50">
+        <div
+          ref={messagesContainerRef}
+          onScroll={handleScroll}
+          className="flex-1 overflow-y-auto p-4 lg:p-8 space-y-6 z-10 relative bg-[#efe7dd] bg-opacity-50"
+        >
           {/* Resumo removido daqui para ir para a lateral */}
           {ticket.messages.map((msg, idx) => {
             const isMe = msg.sender === 'agent';
