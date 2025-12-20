@@ -78,6 +78,16 @@ export default function AppController() {
     setSelectedTicketId(docRef.id);
   };
 
+  const handleCreateContact = async (contactData) => {
+    try {
+      const newContact = await contactsModel.createContact(contactData);
+      return newContact;
+    } catch (error) {
+      console.error('Erro ao criar contato:', error);
+      return null;
+    }
+  };
+
   const handleSmartReply = async (ticket, setInputFn) => {
     setAiState(p => ({...p, replyLoading: true}));
     const history = ticket.messages.map(m => `${m.sender}: ${m.text}`).join('\n');
@@ -263,8 +273,10 @@ export default function AppController() {
               currentUser={authModel.profile}
               selectedId={selectedTicketId}
               tags={settingsModel.tags}
+              contacts={contactsModel.contacts}
               onSelect={(t) => { if (t.status !== 'analyzing') { setSelectedTicketId(t.id); setAiState(p => ({...p, summaryData: null})); }}}
               onCreateTicket={handleCreateTicket}
+              onCreateContact={handleCreateContact}
             />
             <ChatWindow
               ticket={selectedTicket}
