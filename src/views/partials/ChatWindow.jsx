@@ -16,7 +16,7 @@ const ChatHeaderAction = ({ icon: Icon, label, active, onClick, dropdown }) => (
   </div>
 );
 
-export const ChatWindow = ({ ticket, currentUser, departments = [], users = [], tags = [], reasons = [], quickResponses = [], onSend, onClose, onPick, onTransfer, onReopen, onUpdate, aiActions }) => {
+export const ChatWindow = ({ ticket, currentUser, departments = [], users = [], tags = [], reasons = [], quickResponses = [], onSend, onClose, onPick, onTransfer, onReopen, onUpdate, aiActions, onViewContact }) => {
   const [input, setInput] = useState("");
   const [notes, setNotes] = useState("");
   const [saveStatus, setSaveStatus] = useState("saved"); // 'saved', 'saving', 'typing'
@@ -99,7 +99,14 @@ export const ChatWindow = ({ ticket, currentUser, departments = [], users = [], 
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center text-gray-600 font-bold relative"><User size={20} /><div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 border-2 border-white rounded-full"></div></div>
             <div>
-              <h3 className="font-bold text-gray-800 flex items-center gap-2 text-sm">{ticket.customerName}</h3>
+              <button
+                onClick={() => onViewContact && onViewContact(ticket.customerPhone)}
+                className="font-bold text-gray-800 flex items-center gap-2 text-sm hover:text-emerald-600 transition-colors"
+                title="Ver detalhes do contato"
+              >
+                {ticket.customerName}
+                <User size={14} className="text-gray-400" />
+              </button>
               <div className="text-xs text-gray-500 flex items-center gap-1">
                 <span>{ticket.status === 'open' ? 'Aguardando' : ticket.status === 'closed' ? 'Finalizado' : 'Em atendimento'}</span>
                 {ticket.tags && ticket.tags.length > 0 && (

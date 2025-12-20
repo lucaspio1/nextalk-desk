@@ -60,12 +60,16 @@ export const ContactDrawer = ({
     if (newState) {
       if (section === 'conversations' && conversations.length === 0) {
         setLoadingConversations(true);
+        console.log('📞 Carregando conversas do contato:', contact.id);
         const data = await getConversations(contact.id);
+        console.log('📞 Conversas carregadas:', data.length, data);
         setConversations(data);
         setLoadingConversations(false);
       } else if (section === 'activity' && activityLogs.length === 0) {
         setLoadingActivity(true);
+        console.log('📊 Carregando logs de atividade do contato:', contact.id);
         const data = await getActivityLogs(contact.id);
+        console.log('📊 Logs carregados:', data.length, data);
         setActivityLogs(data);
         setLoadingActivity(false);
       }
@@ -97,6 +101,15 @@ export const ContactDrawer = ({
     if (window.confirm(`Tem certeza que deseja excluir o contato "${contact.name}"? Esta ação não pode ser desfeita.`)) {
       onDelete(contact.id);
     }
+  };
+
+  const handleEdit = () => {
+    // Fecha o drawer antes de abrir o modal de edição
+    onClose();
+    // Pequeno delay para garantir que o drawer fechou antes de abrir o modal
+    setTimeout(() => {
+      onEdit(contact);
+    }, 100);
   };
 
   const formatPhone = (phone) => {
@@ -141,7 +154,7 @@ export const ContactDrawer = ({
             <h3 className="text-lg font-bold">Detalhes do Contato</h3>
             <div className="flex gap-2">
               <button
-                onClick={() => onEdit(contact)}
+                onClick={handleEdit}
                 className="text-white/80 hover:text-white hover:bg-white/10 p-2 rounded-lg transition-colors"
               >
                 <Edit2 size={18} />

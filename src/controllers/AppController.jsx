@@ -4,6 +4,7 @@ import { MessageSquare, BarChart2, LogOut, Settings, Users } from 'lucide-react'
 import { useAuthModel } from '../models/hooks/useAuthModel';
 import { useTicketsModel } from '../models/hooks/useTicketsModel';
 import { useSettingsModel } from '../models/hooks/useSettingsModel';
+import { useContactsModel } from '../models/hooks/useContactsModel';
 import { AIService } from '../models/services/AIService';
 import { TicketService } from '../models/services/TicketService.api';
 import { ContactService } from '../models/services/ContactService.api';
@@ -14,15 +15,18 @@ import { AdminView } from '../views/pages/AdminView';
 import { ContactsView } from '../views/pages/ContactsView';
 import { ChatSidebar } from '../views/partials/ChatSidebar';
 import { ChatWindow } from '../views/partials/ChatWindow';
+import { ContactDrawer } from '../views/partials/ContactDrawer';
 
 export default function AppController() {
   const authModel = useAuthModel();
   const ticketModel = useTicketsModel(authModel.profile);
   const settingsModel = useSettingsModel();
+  const contactsModel = useContactsModel();
 
   const [view, setView] = useState('chat');
   const [adminTab, setAdminTab] = useState('connection');
   const [selectedTicketId, setSelectedTicketId] = useState(null);
+  const [selectedContactInChat, setSelectedContactInChat] = useState(null);
   const [loginError, setLoginError] = useState("");
   const [isLoggingIn, setIsLoggingIn] = useState(false);
   const [aiState, setAiState] = useState({ replyLoading: false, summaryLoading: false, summaryData: null });
@@ -203,6 +207,29 @@ export default function AppController() {
     }, 3000);
   };
 
+  // Função para visualizar contato a partir do chat
+  const handleViewContact = async (phone) => {
+    if (!phone) return;
+
+    // Busca contato pelo telefone
+    const contact = contactsModel.contacts.find(c => c.phone === phone);
+
+    if (contact) {
+      setSelectedContactInChat(contact);
+    } else {
+      console.warn('Contato não encontrado para o telefone:', phone);
+      // Tenta criar o contato automaticamente se não existir
+      try {
+        const newContact = await ContactService.findOrCreateByPhone(phone, {
+          name: selectedTicket?.customerName || `Contato ${phone}`
+        });
+        setSelectedContactInChat(newContact);
+      } catch (error) {
+        console.error('Erro ao buscar/criar contato:', error);
+      }
+    }
+  };
+
   if (!authModel.profile) return <LoginView onLogin={handleLogin} isLoading={isLoggingIn} error={loginError} />;
 
   return (
@@ -253,6 +280,7 @@ export default function AppController() {
               onUpdate={handleUpdateTicket}
               onClose={() => { TicketService.updateTicket(selectedTicket.id, { status: 'closed', closedAt: new Date() }); setSelectedTicketId(null); }}
               onPick={handlePickTicket}
+              onViewContact={handleViewContact}
               aiActions={{
                 onSmartReply: handleSmartReply,
                 onSummarize: handleSummarize,
@@ -262,6 +290,27 @@ export default function AppController() {
                 summary: aiState.summaryData
               }}
             />
+            {/* Drawer de contato na view de chat */}
+            {selectedContactInChat && (
+              <ContactDrawer
+                contact={selectedContactInChat}
+                tags={settingsModel.tags}
+                onClose={() => setSelectedContactInChat(null)}
+                onEdit={(contact) => {
+                  // Quando editar, fecha o drawer atual
+                  // O modal será aberto pelo ContactsView se necessário
+                  setSelectedContactInChat(null);
+                }}
+                onUpdate={(id, data) => contactsModel.updateContact(id, data)}
+                onBlock={(id, blocked) => contactsModel.blockContact(id, blocked)}
+                onDelete={(id) => {
+                  contactsModel.deleteContact(id);
+                  setSelectedContactInChat(null);
+                }}
+                getConversations={(id) => contactsModel.getContactConversations(id)}
+                getActivityLogs={(id) => contactsModel.getContactActivityLogs(id)}
+              />
+            )}
           </>
         )}
         {view === 'settings' && <AdminView activeTab={adminTab} onTabChange={setAdminTab} />}
