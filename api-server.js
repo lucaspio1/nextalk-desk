@@ -527,6 +527,144 @@ collections.forEach(collectionName => {
   });
 });
 
+// ===========================================
+// ROTAS ESPECÍFICAS - CONTACTS
+// ===========================================
+
+// GET /api/contacts/:id/conversations - Busca todos os tickets (conversas) de um contato
+app.get('/api/contacts/:id/conversations', async (req, res) => {
+  try {
+    const contact = await db.collection('contacts')
+      .findOne({ _id: new ObjectId(req.params.id) });
+
+    if (!contact) {
+      return res.status(404).json({ error: 'Contato não encontrado' });
+    }
+
+    // Busca tickets pelo telefone do contato
+    const tickets = await db.collection('tickets')
+      .find({ customerPhone: contact.phone })
+      .sort({ createdAt: -1 })
+      .toArray();
+
+    res.json(normalizeDocuments(tickets));
+  } catch (error) {
+    console.error('Error fetching contact conversations:', error);
+    res.status(500).json({ error: 'Erro ao buscar conversas do contato' });
+  }
+});
+
+// GET /api/contacts/:id/activity-logs - Busca logs de atividade do contato
+app.get('/api/contacts/:id/activity-logs', async (req, res) => {
+  try {
+    const contact = await db.collection('contacts')
+      .findOne({ _id: new ObjectId(req.params.id) });
+
+    if (!contact) {
+      return res.status(404).json({ error: 'Contato não encontrado' });
+    }
+
+    // Busca tickets do contato e extrai eventos relevantes
+    const tickets = await db.collection('tickets')
+      .find({ customerPhone: contact.phone })
+      .sort({ createdAt: -1 })
+      .toArray();
+
+    // Gera logs de atividade baseado nos tickets
+    const activityLogs = [];
+
+    tickets.forEach(ticket => {
+      // Log de criação do ticket
+      activityLogs.push({
+        id: `${ticket._id}_created`,
+        type: 'ticket_created',
+        description: `Ticket criado: ${ticket.customerName}`,
+        timestamp: ticket.createdAt,
+        ticketId: ticket._id.toString()
+      });
+
+      // Log de início do atendimento
+      if (ticket.startedAt) {
+        activityLogs.push({
+          id: `${ticket._id}_started`,
+          type: 'ticket_started',
+          description: `Atendimento iniciado por ${ticket.agentId || 'Sistema'}`,
+          timestamp: ticket.startedAt,
+          ticketId: ticket._id.toString()
+        });
+      }
+
+      // Log de finalização
+      if (ticket.closedAt) {
+        activityLogs.push({
+          id: `${ticket._id}_closed`,
+          type: 'ticket_closed',
+          description: 'Ticket finalizado',
+          timestamp: ticket.closedAt,
+          ticketId: ticket._id.toString()
+        });
+      }
+
+      // Logs de mensagens do sistema (transferências, etc)
+      if (ticket.messages) {
+        ticket.messages
+          .filter(msg => msg.sender === 'system')
+          .forEach((msg, idx) => {
+            activityLogs.push({
+              id: `${ticket._id}_msg_${idx}`,
+              type: 'system_message',
+              description: msg.text,
+              timestamp: msg.timestamp ? new Date(msg.timestamp) : ticket.updatedAt,
+              ticketId: ticket._id.toString()
+            });
+          });
+      }
+    });
+
+    // Ordena por timestamp decrescente
+    activityLogs.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+
+    res.json(activityLogs);
+  } catch (error) {
+    console.error('Error fetching contact activity logs:', error);
+    res.status(500).json({ error: 'Erro ao buscar logs de atividade' });
+  }
+});
+
+// PUT /api/contacts/:id/block - Bloqueia ou desbloqueia um contato
+app.put('/api/contacts/:id/block', async (req, res) => {
+  try {
+    const { blocked } = req.body;
+
+    if (typeof blocked !== 'boolean') {
+      return res.status(400).json({ error: 'Parâmetro "blocked" deve ser boolean' });
+    }
+
+    const result = await db.collection('contacts').updateOne(
+      { _id: new ObjectId(req.params.id) },
+      {
+        $set: {
+          blocked,
+          updatedAt: new Date()
+        }
+      }
+    );
+
+    if (result.matchedCount === 0) {
+      return res.status(404).json({ error: 'Contato não encontrado' });
+    }
+
+    // Buscar contato atualizado
+    const contact = await db.collection('contacts')
+      .findOne({ _id: new ObjectId(req.params.id) });
+
+    res.json(normalizeDocument(contact));
+  } catch (error) {
+    console.error('Error blocking/unblocking contact:', error);
+    res.status(500).json({ error: 'Erro ao bloquear/desbloquear contato' });
+  }
+});
+
 // GET /api/settings/general
 app.get('/api/settings/general', async (req, res) => {
   try {

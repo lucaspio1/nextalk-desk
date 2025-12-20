@@ -1,15 +1,17 @@
 import React, { useState } from 'react';
-import { MessageSquare, BarChart2, LogOut, Settings } from 'lucide-react';
+import { MessageSquare, BarChart2, LogOut, Settings, Users } from 'lucide-react';
 
 import { useAuthModel } from '../models/hooks/useAuthModel';
 import { useTicketsModel } from '../models/hooks/useTicketsModel';
 import { useSettingsModel } from '../models/hooks/useSettingsModel';
 import { AIService } from '../models/services/AIService';
 import { TicketService } from '../models/services/TicketService.api';
+import { ContactService } from '../models/services/ContactService.api';
 
 import { LoginView } from '../views/pages/LoginView';
 import { DashboardView } from '../views/pages/DashboardView';
 import { AdminView } from '../views/pages/AdminView';
+import { ContactsView } from '../views/pages/ContactsView';
 import { ChatSidebar } from '../views/partials/ChatSidebar';
 import { ChatWindow } from '../views/partials/ChatWindow';
 
@@ -51,6 +53,14 @@ export default function AppController() {
   };
 
   const handleCreateTicket = async ({ name, phone, message }) => {
+    // Busca ou cria contato automaticamente
+    try {
+      await ContactService.findOrCreateByPhone(phone, { name });
+    } catch (error) {
+      console.error('Erro ao criar/atualizar contato:', error);
+      // Continua criando o ticket mesmo se falhar a criação do contato
+    }
+
     const docRef = await TicketService.createTicket({
       customerName: name,
       customerPhone: phone,
@@ -209,6 +219,7 @@ export default function AppController() {
           </div>
           <div className="flex bg-gray-100 rounded-lg p-1">
             <button onClick={() => setView('chat')} className={`p-2 rounded-md transition-all ${view === 'chat' ? 'bg-white shadow-sm text-emerald-600' : 'text-gray-400 hover:text-gray-600'}`}><MessageSquare size={20}/></button>
+            <button onClick={() => setView('contacts')} className={`p-2 rounded-md transition-all ${view === 'contacts' ? 'bg-white shadow-sm text-emerald-600' : 'text-gray-400 hover:text-gray-600'}`}><Users size={20}/></button>
             <button onClick={() => setView('dashboard')} className={`p-2 rounded-md transition-all ${view === 'dashboard' ? 'bg-white shadow-sm text-emerald-600' : 'text-gray-400 hover:text-gray-600'}`}><BarChart2 size={20}/></button>
             <button onClick={() => setView('settings')} className={`p-2 rounded-md transition-all ${view === 'settings' ? 'bg-white shadow-sm text-emerald-600' : 'text-gray-400 hover:text-gray-600'}`}><Settings size={20}/></button>
           </div>
@@ -217,6 +228,7 @@ export default function AppController() {
       </header>
       <main className="flex-1 flex overflow-hidden relative">
         {view === 'dashboard' && <DashboardView stats={ticketModel.stats} />}
+        {view === 'contacts' && <ContactsView tags={settingsModel.tags} />}
         {view === 'chat' && (
           <>
             <ChatSidebar
