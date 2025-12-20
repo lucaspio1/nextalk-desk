@@ -1,11 +1,11 @@
 import React, { useState, useMemo } from 'react';
-import { PlusCircle, Search, CheckCircle, User, X, Loader2 } from 'lucide-react';
+import { PlusCircle, Search, CheckCircle, User, Loader2 } from 'lucide-react';
 import { Badge } from '../components/UIComponents';
+import { NewConversationModal } from './NewConversationModal';
 
-export const ChatSidebar = ({ tickets, currentUser, selectedId, onSelect, onCreateTicket, tags = [] }) => {
+export const ChatSidebar = ({ tickets, currentUser, selectedId, onSelect, onCreateTicket, tags = [], contacts = [], onCreateContact }) => {
   const [activeFilter, setActiveFilter] = useState('mine');
   const [showNewChat, setShowNewChat] = useState(false);
-  const [newChatData, setNewChatData] = useState({ name: '', phone: '', message: '' });
 
   // Contagem
   const counts = useMemo(() => {
@@ -36,12 +36,6 @@ export const ChatSidebar = ({ tickets, currentUser, selectedId, onSelect, onCrea
     });
   }, [tickets, activeFilter, currentUser]);
 
-  const handleCreate = (e) => {
-    e.preventDefault();
-    onCreateTicket(newChatData);
-    setShowNewChat(false);
-    setNewChatData({ name: '', phone: '', message: '' });
-  };
 
   // Helper para formatar datas (compatível com MongoDB e Firebase)
   const formatTime = (dateValue) => {
@@ -103,33 +97,15 @@ export const ChatSidebar = ({ tickets, currentUser, selectedId, onSelect, onCrea
 
   return (
     <div className="w-full md:w-80 bg-white border-r border-gray-200 flex flex-col h-full shrink-0 z-10 relative">
-      {/* Modal Overlay */}
+      {/* Novo Modal de Conversa */}
       {showNewChat && (
-        <div className="absolute inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-           <div className="bg-white rounded-lg shadow-xl w-full max-w-sm overflow-hidden animate-in fade-in zoom-in-95 duration-200">
-              <div className="px-4 py-3 border-b border-gray-100 flex justify-between items-center bg-gray-50">
-                 <h3 className="font-bold text-gray-700">Nova Conversa</h3>
-                 <button onClick={() => setShowNewChat(false)} className="text-gray-400 hover:text-gray-600"><X size={18} /></button>
-              </div>
-              <form onSubmit={handleCreate} className="p-4 space-y-3">
-                 <div>
-                    <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Nome do Contato</label>
-                    <input required className="w-full p-2 border border-gray-200 rounded text-sm focus:ring-2 focus:ring-emerald-500 outline-none" value={newChatData.name} onChange={e => setNewChatData({...newChatData, name: e.target.value})} placeholder="Ex: João Silva" />
-                 </div>
-                 <div>
-                    <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Telefone (WhatsApp)</label>
-                    <input required className="w-full p-2 border border-gray-200 rounded text-sm focus:ring-2 focus:ring-emerald-500 outline-none" value={newChatData.phone} onChange={e => setNewChatData({...newChatData, phone: e.target.value})} placeholder="5511999999999" />
-                 </div>
-                 <div>
-                    <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Mensagem Inicial</label>
-                    <textarea className="w-full p-2 border border-gray-200 rounded text-sm focus:ring-2 focus:ring-emerald-500 outline-none resize-none" rows="3" value={newChatData.message} onChange={e => setNewChatData({...newChatData, message: e.target.value})} placeholder="Olá, como posso ajudar?"></textarea>
-                 </div>
-                 <div className="pt-2">
-                    <button type="submit" className="w-full bg-emerald-600 text-white py-2 rounded-lg font-medium hover:bg-emerald-700 transition-colors">Iniciar Conversa</button>
-                 </div>
-              </form>
-           </div>
-        </div>
+        <NewConversationModal
+          contacts={contacts}
+          tags={tags}
+          onClose={() => setShowNewChat(false)}
+          onCreateTicket={onCreateTicket}
+          onCreateContact={onCreateContact}
+        />
       )}
 
       <div className="p-4 border-b border-gray-200 bg-gray-50/50">
