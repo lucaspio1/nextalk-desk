@@ -24,20 +24,20 @@ dotenv.config();
 
 const app = express();
 const PORT = process.env.VITE_WEBHOOK_PORT || 3000;
-const VERIFY_TOKEN = process.env.VITE_WEBHOOK_VERIFY_TOKEN || 'nextalk_webhook_2024';
+const VERIFY_TOKEN = process.env.VITE_WEBHOOK_VERIFY_TOKEN;
 const WHATSAPP_TOKEN = process.env.VITE_WHATSAPP_ACCESS_TOKEN;
 const PHONE_NUMBER_ID = process.env.VITE_WHATSAPP_PHONE_NUMBER_ID;
 
 // MongoDB Configuration
-const MONGODB_URI = process.env.VITE_MONGODB_URI || 'mongodb://localhost:27017';
-const MONGODB_DB_NAME = process.env.VITE_MONGODB_DB_NAME || 'nextalk_desk';
+const MONGODB_URI = process.env.VITE_MONGODB_URI;
+const MONGODB_DB_NAME = process.env.VITE_MONGODB_DB_NAME;
 const MONGODB_USER = process.env.VITE_MONGODB_USER;
 const MONGODB_PASSWORD = process.env.VITE_MONGODB_PASSWORD;
 
 // Redis Configuration
-const REDIS_HOST = process.env.VITE_REDIS_HOST || '172.18.0.5';
-const REDIS_PORT = process.env.VITE_REDIS_PORT || 6379;
-const REDIS_PASSWORD = process.env.VITE_REDIS_PASSWORD || 'redis_TFxfeP';
+const REDIS_HOST = process.env.VITE_REDIS_HOST;
+const REDIS_PORT = process.env.VITE_REDIS_PORT;
+const REDIS_PASSWORD = process.env.VITE_REDIS_PASSWORD;
 
 // ===========================================
 // INICIALIZAÇÃO DO MONGODB
