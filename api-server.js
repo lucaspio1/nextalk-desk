@@ -320,19 +320,7 @@ app.post('/api/tickets/:id/messages', async (req, res) => {
       timestamp: new Date().getTime()
     };
 
-    // 3. Atualizar MongoDB 
-    await db.collection('tickets').updateOne(
-      { _id: new ObjectId(req.params.id) },
-      {
-        $push: { messages: messageWithTimestamp },
-        $set: {
-          updatedAt: new Date(),
-          customerPhone: normalizedPhone // Garante número consistente
-        }
-      }
-    );
-
-    // 4. Enviar para WhatsApp (apenas mensagens do agente)
+    // 3. Enviar para WhatsApp (apenas mensagens do agente) antes de salvar no banco
     if (message.sender === 'agent' && WHATSAPP_TOKEN && PHONE_NUMBER_ID && normalizedPhone) {
       try {
         console.log(`📤 Tentando enviar para: ${normalizedPhone}`);
@@ -359,31 +347,46 @@ app.post('/api/tickets/:id/messages', async (req, res) => {
         if (!whatsappResponse.ok) {
           console.error('❌ Erro detalhado WhatsApp:', JSON.stringify(whatsappData, null, 2));
           console.error(`   Código: ${whatsappData.error?.code}`);
-          console.error(`   Tipo: ${whatsappData.error?.type}`);
-          console.error(`   Mensagem: ${whatsappData.error?.message}`);
-          console.error(`   Fbtrace: ${whatsappData.error?.fbtrace_id}`);
 
-          // Se erro for de janela de 24h, não retornar erro (mensagem foi salva no MongoDB)
-          if (whatsappData.error?.code === 131047 || whatsappData.error?.code === 131026) {
-            console.warn('⚠️  Erro de janela 24h - Mensagem salva mas não enviada ao WhatsApp');
-            // Não retorna erro para não quebrar o fluxo
+          if (whatsappData.error?.code === 131047) {
+            console.warn('⚠️  Erro de janela 24h - Fora da janela');
+            return res.status(400).json({
+              error: 'Janela de 24 horas fechada. É necessário enviar um Template pré-aprovado.'
+            });
+          } else if (whatsappData.error?.code === 131026) {
+            return res.status(400).json({
+              error: 'Falha no envio: Número inválido ou bloqueio de spam.'
+            });
           } else {
             return res.status(500).json({
-              error: 'Erro ao enviar para WhatsApp',
+              error: 'Erro da Meta API ao enviar',
               details: whatsappData
             });
           }
         } else {
           console.log('✅ Mensagem enviada para WhatsApp:', whatsappData.messages[0].id);
+          messageWithTimestamp.metaMessageId = whatsappData.messages[0].id;
         }
       } catch (whatsappError) {
-        console.error('❌ Erro ao chamar API do WhatsApp:', whatsappError);
+        console.error('❌ Erro de rede ao chamar API do WhatsApp:', whatsappError);
         return res.status(500).json({
-          error: 'Erro ao enviar para WhatsApp',
+          error: 'Erro de rede ao comunicar com WhatsApp',
           details: whatsappError.message
         });
       }
     }
+
+    // 4. Atualizar MongoDB (somente se o envio para Meta funcionou)
+    await db.collection('tickets').updateOne(
+      { _id: new ObjectId(req.params.id) },
+      {
+        $push: { messages: messageWithTimestamp },
+        $set: {
+          updatedAt: new Date(),
+          customerPhone: normalizedPhone // Garante número consistente
+        }
+      }
+    );
 
     // 5. Buscar ticket atualizado
     const updatedTicket = await db.collection('tickets')
@@ -426,6 +429,70 @@ app.delete('/api/tickets/:id', async (req, res) => {
   } catch (error) {
     console.error('Error deleting ticket:', error);
     res.status(500).json({ error: 'Erro ao deletar ticket' });
+  }
+});
+
+// ===========================================
+// ROTAS - WHATSAPP API DIRECT (MIGRADAS DO FRONTEND)
+// ===========================================
+
+// GET /api/whatsapp/status - Verifica o status da conexão com a API do WhatsApp
+app.get('/api/whatsapp/status', async (req, res) => {
+  if (!PHONE_NUMBER_ID || !WHATSAPP_TOKEN) {
+    return res.json({ state: 'DISCONNECTED', missingConfig: true });
+  }
+
+  try {
+    const url = `https://graph.facebook.com/${WHATSAPP_API_VERSION}/${PHONE_NUMBER_ID}`;
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${WHATSAPP_TOKEN}`,
+        'Content-Type': 'application/json'
+      }
+    });
+
+    if (response.ok) {
+      const data = await response.json();
+      return res.json({ state: 'CONNECTED', details: data });
+    } else {
+      const err = await response.json();
+      return res.json({ state: 'DISCONNECTED', error: true, details: err });
+    }
+  } catch (error) {
+    return res.json({ state: 'DISCONNECTED', error: true, message: error.message });
+  }
+});
+
+// POST /api/tickets/read - Marca uma mensagem como lida no WhatsApp
+app.post('/api/tickets/read', async (req, res) => {
+  const { messageId } = req.body;
+  if (!messageId || !PHONE_NUMBER_ID || !WHATSAPP_TOKEN) {
+    return res.status(400).json({ error: 'Faltam parâmetros ou configuração' });
+  }
+
+  try {
+    const response = await fetch(`https://graph.facebook.com/${WHATSAPP_API_VERSION}/${PHONE_NUMBER_ID}/messages`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${WHATSAPP_TOKEN}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        messaging_product: 'whatsapp',
+        status: 'read',
+        message_id: messageId
+      })
+    });
+
+    if (response.ok) {
+      return res.json({ success: true });
+    } else {
+      const err = await response.json();
+      return res.status(500).json({ error: 'Erro ao marcar como lido', details: err });
+    }
+  } catch (error) {
+    return res.status(500).json({ error: 'Erro de rede', message: error.message });
   }
 });
 

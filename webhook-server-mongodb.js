@@ -18,19 +18,21 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import { MongoClient, ObjectId } from 'mongodb';
 import { createClient } from 'redis';
+import crypto from 'crypto';
 
 // Carrega variáveis de ambiente
 dotenv.config();
 
 const app = express();
-const PORT = process.env.VITE_WEBHOOK_PORT || 3000;
+const PORT = process.env.VITE_WEBHOOK_PORT || 3001;
 const VERIFY_TOKEN = process.env.VITE_WEBHOOK_VERIFY_TOKEN;
 const WHATSAPP_TOKEN = process.env.VITE_WHATSAPP_ACCESS_TOKEN;
+const APP_SECRET = process.env.VITE_WHATSAPP_APP_SECRET || '';
 const PHONE_NUMBER_ID = process.env.VITE_WHATSAPP_PHONE_NUMBER_ID;
 
 // MongoDB Configuration
-const MONGODB_URI = process.env.VITE_MONGODB_URI;
-const MONGODB_DB_NAME = process.env.VITE_MONGODB_DB_NAME;
+const MONGODB_URI = process.env.VITE_MONGODB_URI || 'mongodb://127.0.0.1:27017';
+const MONGODB_DB_NAME = process.env.VITE_MONGODB_DB_NAME || 'nextalk_desk';
 const MONGODB_USER = process.env.VITE_MONGODB_USER;
 const MONGODB_PASSWORD = process.env.VITE_MONGODB_PASSWORD;
 
@@ -144,7 +146,11 @@ connectRedis();
 // ===========================================
 
 app.use(cors());
-app.use(express.json());
+app.use(express.json({
+  verify: (req, res, buf) => {
+    req.rawBody = buf;
+  }
+}));
 
 // Middleware de logging
 app.use((req, res, next) => {
@@ -156,45 +162,6 @@ app.use((req, res, next) => {
 // FUNÇÕES AUXILIARES
 // ===========================================
 
-/**
- * Marca uma mensagem como lida no WhatsApp
- */
-async function markMessageAsRead(messageId) {
-  if (!WHATSAPP_TOKEN || !PHONE_NUMBER_ID) {
-    console.warn('⚠️  Token ou Phone Number ID não configurado');
-    return false;
-  }
-
-  try {
-    const response = await fetch(
-      `https://graph.facebook.com/v19.0/${PHONE_NUMBER_ID}/messages`,
-      {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${WHATSAPP_TOKEN}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          messaging_product: 'whatsapp',
-          status: 'read',
-          message_id: messageId
-        })
-      }
-    );
-
-    if (response.ok) {
-      console.log(`✅ Mensagem ${messageId} marcada como lida`);
-      return true;
-    } else {
-      const error = await response.json();
-      console.error('❌ Erro ao marcar mensagem como lida:', error);
-      return false;
-    }
-  } catch (error) {
-    console.error('❌ Erro ao marcar mensagem:', error);
-    return false;
-  }
-}
 
 /**
  * Processa o conteúdo da mensagem baseado no tipo
@@ -257,6 +224,22 @@ function processMessageContent(message) {
         type: 'contacts',
         content: `👤 Contato: ${message.contacts[0]?.name?.formatted_name || 'Sem nome'}`,
         contacts: message.contacts
+      };
+
+    case 'interactive':
+      const interactiveType = message.interactive.type;
+      let interactiveContent = '[Interação]';
+      
+      if (interactiveType === 'button_reply') {
+        interactiveContent = message.interactive.button_reply.title;
+      } else if (interactiveType === 'list_reply') {
+        interactiveContent = message.interactive.list_reply.title;
+      }
+      
+      return {
+        type: 'interactive',
+        content: interactiveContent,
+        interactiveId: message.interactive[interactiveType]?.id
       };
 
     default:
@@ -404,11 +387,26 @@ app.post('/webhook', async (req, res) => {
   try {
     const body = req.body;
 
+    // Validação de Segurança (X-Hub-Signature-256)
+    const signature = req.headers['x-hub-signature-256'];
+    if (APP_SECRET && signature && req.rawBody) {
+      const expectedSignature = 'sha256=' + crypto.createHmac('sha256', APP_SECRET).update(req.rawBody).digest('hex');
+      if (signature !== expectedSignature) {
+        console.error('❌ Assinatura X-Hub-Signature-256 inválida! Bloqueando requisição.');
+        return res.sendStatus(403);
+      }
+    }
+
     // Verifica se é um evento do WhatsApp Business
     if (body.object !== 'whatsapp_business_account') {
       console.log('⚠️  Evento não é do WhatsApp Business');
       return res.sendStatus(404);
     }
+
+    // Responde 200 OK imediatamente para evitar Timeout da Meta (20s) e duplicatas
+    res.sendStatus(200);
+
+    // Processamento assíncrono em background
 
     // Processa cada entrada
     for (const entry of body.entry || []) {
@@ -435,9 +433,6 @@ app.post('/webhook', async (req, res) => {
 
             // Cria ou atualiza ticket no MongoDB
             await createOrUpdateTicket(from, customerName, messageData);
-
-            // Marca mensagem como lida
-            await markMessageAsRead(messageId);
           }
         }
 
@@ -470,8 +465,6 @@ app.post('/webhook', async (req, res) => {
       }
     }
 
-    // Responde rapidamente para a Meta
-    res.sendStatus(200);
   } catch (error) {
     console.error('❌ Erro ao processar webhook:', error);
     res.sendStatus(500);

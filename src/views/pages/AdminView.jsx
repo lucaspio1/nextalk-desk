@@ -8,7 +8,6 @@ import {
 } from 'lucide-react';
 
 import { Button, ToggleSwitch, SectionHeader, AdminTable } from '../components/UIComponents';
-import { WhatsAppService } from '../../models/services/WhatsAppService';
 import { SettingsService } from '../../models/services/SettingsService.api';
 import { PaymentService } from '../../models/services/PaymentService.api';
 
@@ -341,7 +340,7 @@ const AdminContent = ({ activeTab }) => {
     // Efeitos (Carregamento de dados)
     useEffect(() => {
         if (activeTab === 'connection') {
-            WhatsAppService.getStatus().then(s => setStatus(s.state));
+            SettingsService.getWhatsAppStatus().then(s => setStatus(s.state));
         } else if (activeTab === 'general') {
             loadGeneralSettings();
         } else if (activeTab === 'quick') {
@@ -560,7 +559,7 @@ const AdminContent = ({ activeTab }) => {
     const handleConnect = async () => {
         setIsLoading(true);
         try {
-            const res = await WhatsAppService.getStatus();
+            const res = await SettingsService.getWhatsAppStatus();
             setStatus(res.state);
         } catch (error) {
             console.error('Erro ao verificar conexão WhatsApp:', error);

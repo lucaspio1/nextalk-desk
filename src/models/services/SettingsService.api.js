@@ -8,6 +8,21 @@ const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:4000/api';
 
 export const SettingsService = {
   // ==========================================
+  // WHATSAPP SETTINGS
+  // ==========================================
+
+  async getWhatsAppStatus() {
+    try {
+      const response = await fetch(`${API_URL}/whatsapp/status`);
+      if (!response.ok) throw new Error('Erro ao buscar status do WhatsApp');
+      return await response.json();
+    } catch (error) {
+      console.error('Error fetching WhatsApp status:', error);
+      return { state: 'DISCONNECTED', error: true };
+    }
+  },
+
+  // ==========================================
   // GENERAL SETTINGS
   // ==========================================
 
