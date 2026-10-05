@@ -27,20 +27,44 @@ const io = new Server(httpServer, {
 const PORT = process.env.VITE_API_PORT || 4000;
 
 // MongoDB Configuration
-const MONGODB_URI = process.env.VITE_MONGODB_URI || 'mongodb://172.18.0.2:27017';
+const MONGODB_URI = process.env.VITE_MONGODB_URI || 'mongodb://127.0.0.1:27017';
 const MONGODB_DB_NAME = process.env.VITE_MONGODB_DB_NAME || 'nextalk_desk';
 const MONGODB_USER = process.env.VITE_MONGODB_USER;
 const MONGODB_PASSWORD = process.env.VITE_MONGODB_PASSWORD;
 
 // Redis Configuration
-const REDIS_HOST = process.env.VITE_REDIS_HOST || '172.18.0.5';
+const REDIS_HOST = process.env.VITE_REDIS_HOST || '127.0.0.1';
 const REDIS_PORT = process.env.VITE_REDIS_PORT || 6379;
 const REDIS_PASSWORD = process.env.VITE_REDIS_PASSWORD || 'redis_TFxfeP';
 
-// WhatsApp Configuration
-const WHATSAPP_TOKEN = process.env.VITE_WHATSAPP_ACCESS_TOKEN;
-const PHONE_NUMBER_ID = process.env.VITE_WHATSAPP_PHONE_NUMBER_ID;
+// WhatsApp Configuration (Valores globais de fallback para ambiente sem DB configurado)
+const FALLBACK_WHATSAPP_TOKEN = process.env.VITE_WHATSAPP_ACCESS_TOKEN;
+const FALLBACK_PHONE_NUMBER_ID = process.env.VITE_WHATSAPP_PHONE_NUMBER_ID;
 const WHATSAPP_API_VERSION = process.env.VITE_WHATSAPP_API_VERSION || 'v24.0';
+
+// ===========================================
+// FUNÇÕES AUXILIARES
+// ===========================================
+
+/**
+ * Busca a configuração do WhatsApp no banco de dados (system_settings).
+ * Caso não encontre, utiliza as variáveis de ambiente como fallback.
+ */
+async function getWhatsAppConfig() {
+  let dbConfig = null;
+  if (db) {
+    dbConfig = await db.collection('system_settings').findOne({ type: 'whatsapp_config' });
+  }
+  
+  return {
+    access_token: dbConfig?.access_token || FALLBACK_WHATSAPP_TOKEN,
+    phone_number_id: dbConfig?.phone_number_id || FALLBACK_PHONE_NUMBER_ID,
+    waba_id: dbConfig?.waba_id || process.env.VITE_WHATSAPP_WABA_ID,
+    app_secret: dbConfig?.app_secret || process.env.VITE_WHATSAPP_APP_SECRET || '',
+    fb_app_id: dbConfig?.fb_app_id || process.env.VITE_FACEBOOK_APP_ID || '',
+    fb_config_id: dbConfig?.fb_config_id || process.env.VITE_FACEBOOK_CONFIG_ID || ''
+  };
+}
 
 // Configuração do Microsserviço Pagamento
 const PAYMENT_SERVICE_URL = process.env.PAYMENT_SERVICE_URL || 'http://172.18.0.8:4001';
@@ -320,17 +344,20 @@ app.post('/api/tickets/:id/messages', async (req, res) => {
       timestamp: new Date().getTime()
     };
 
-    // 3. Enviar para WhatsApp (apenas mensagens do agente) antes de salvar no banco
-    if (message.sender === 'agent' && WHATSAPP_TOKEN && PHONE_NUMBER_ID && normalizedPhone) {
+    // 3. Obter configuração do WhatsApp
+    const { access_token, phone_number_id } = await getWhatsAppConfig();
+
+    // 4. Enviar para WhatsApp (apenas mensagens do agente) antes de salvar no banco
+    if (message.sender === 'agent' && access_token && phone_number_id && normalizedPhone) {
       try {
         console.log(`📤 Tentando enviar para: ${normalizedPhone}`);
 
         const whatsappResponse = await fetch(
-          `https://graph.facebook.com/${WHATSAPP_API_VERSION}/${PHONE_NUMBER_ID}/messages`,
+          `https://graph.facebook.com/${WHATSAPP_API_VERSION}/${phone_number_id}/messages`,
           {
             method: 'POST',
             headers: {
-              'Authorization': `Bearer ${WHATSAPP_TOKEN}`,
+              'Authorization': `Bearer ${access_token}`,
               'Content-Type': 'application/json'
             },
             body: JSON.stringify({
@@ -438,16 +465,18 @@ app.delete('/api/tickets/:id', async (req, res) => {
 
 // GET /api/whatsapp/status - Verifica o status da conexão com a API do WhatsApp
 app.get('/api/whatsapp/status', async (req, res) => {
-  if (!PHONE_NUMBER_ID || !WHATSAPP_TOKEN) {
+  const { access_token, phone_number_id } = await getWhatsAppConfig();
+
+  if (!phone_number_id || !access_token) {
     return res.json({ state: 'DISCONNECTED', missingConfig: true });
   }
 
   try {
-    const url = `https://graph.facebook.com/${WHATSAPP_API_VERSION}/${PHONE_NUMBER_ID}`;
+    const url = `https://graph.facebook.com/${WHATSAPP_API_VERSION}/${phone_number_id}`;
     const response = await fetch(url, {
       method: 'GET',
       headers: {
-        'Authorization': `Bearer ${WHATSAPP_TOKEN}`,
+        'Authorization': `Bearer ${access_token}`,
         'Content-Type': 'application/json'
       }
     });
@@ -467,15 +496,17 @@ app.get('/api/whatsapp/status', async (req, res) => {
 // POST /api/tickets/read - Marca uma mensagem como lida no WhatsApp
 app.post('/api/tickets/read', async (req, res) => {
   const { messageId } = req.body;
-  if (!messageId || !PHONE_NUMBER_ID || !WHATSAPP_TOKEN) {
+  const { access_token, phone_number_id } = await getWhatsAppConfig();
+
+  if (!messageId || !phone_number_id || !access_token) {
     return res.status(400).json({ error: 'Faltam parâmetros ou configuração' });
   }
 
   try {
-    const response = await fetch(`https://graph.facebook.com/${WHATSAPP_API_VERSION}/${PHONE_NUMBER_ID}/messages`, {
+    const response = await fetch(`https://graph.facebook.com/${WHATSAPP_API_VERSION}/${phone_number_id}/messages`, {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${WHATSAPP_TOKEN}`,
+        'Authorization': `Bearer ${access_token}`,
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
@@ -493,6 +524,44 @@ app.post('/api/tickets/read', async (req, res) => {
     }
   } catch (error) {
     return res.status(500).json({ error: 'Erro de rede', message: error.message });
+  }
+});
+
+// GET /api/settings/whatsapp - Retorna as configurações salvas
+app.get('/api/settings/whatsapp', async (req, res) => {
+  try {
+    const config = await getWhatsAppConfig();
+    return res.json(config);
+  } catch (error) {
+    return res.status(500).json({ error: 'Erro ao buscar configurações' });
+  }
+});
+
+// POST /api/settings/whatsapp - Salva as configurações do WhatsApp no Banco de Dados
+app.post('/api/settings/whatsapp', async (req, res) => {
+  try {
+    const { access_token, phone_number_id, waba_id, app_secret, fb_app_id, fb_config_id } = req.body;
+    
+    await db.collection('system_settings').updateOne(
+      { type: 'whatsapp_config' },
+      { 
+        $set: {
+          access_token,
+          phone_number_id,
+          waba_id,
+          app_secret,
+          fb_app_id,
+          fb_config_id,
+          updatedAt: new Date()
+        } 
+      },
+      { upsert: true }
+    );
+    
+    return res.json({ success: true, message: 'Configurações salvas com sucesso' });
+  } catch (error) {
+    console.error('Erro ao salvar config whatsapp:', error);
+    return res.status(500).json({ error: 'Erro interno ao salvar configurações' });
   }
 });
 

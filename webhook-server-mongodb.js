@@ -25,10 +25,8 @@ dotenv.config();
 
 const app = express();
 const PORT = process.env.VITE_WEBHOOK_PORT || 3001;
-const VERIFY_TOKEN = process.env.VITE_WEBHOOK_VERIFY_TOKEN;
-const WHATSAPP_TOKEN = process.env.VITE_WHATSAPP_ACCESS_TOKEN;
-const APP_SECRET = process.env.VITE_WHATSAPP_APP_SECRET || '';
-const PHONE_NUMBER_ID = process.env.VITE_WHATSAPP_PHONE_NUMBER_ID;
+const FALLBACK_VERIFY_TOKEN = process.env.VITE_WEBHOOK_VERIFY_TOKEN;
+const FALLBACK_APP_SECRET = process.env.VITE_WHATSAPP_APP_SECRET || '';
 
 // MongoDB Configuration
 const MONGODB_URI = process.env.VITE_MONGODB_URI || 'mongodb://127.0.0.1:27017';
@@ -162,7 +160,20 @@ app.use((req, res, next) => {
 // FUNÇÕES AUXILIARES
 // ===========================================
 
-
+/**
+ * Busca as configurações no banco de dados.
+ */
+async function getWhatsAppConfig() {
+  let dbConfig = null;
+  if (db) {
+    dbConfig = await db.collection('system_settings').findOne({ type: 'whatsapp_config' });
+  }
+  
+  return {
+    verify_token: dbConfig?.verify_token || FALLBACK_VERIFY_TOKEN,
+    app_secret: dbConfig?.app_secret || FALLBACK_APP_SECRET
+  };
+}
 /**
  * Processa o conteúdo da mensagem baseado no tipo
  */
@@ -366,12 +377,14 @@ async function createOrUpdateTicket(phoneNumber, customerName, messageData) {
 /**
  * GET /webhook - Verificação do webhook pela Meta
  */
-app.get('/webhook', (req, res) => {
+app.get('/webhook', async (req, res) => {
   const mode = req.query['hub.mode'];
   const token = req.query['hub.verify_token'];
   const challenge = req.query['hub.challenge'];
 
-  if (mode === 'subscribe' && token === VERIFY_TOKEN) {
+  const { verify_token } = await getWhatsAppConfig();
+
+  if (mode === 'subscribe' && token === verify_token) {
     console.log('✅ Webhook verificado pela Meta');
     res.status(200).send(challenge);
   } else {
@@ -389,8 +402,10 @@ app.post('/webhook', async (req, res) => {
 
     // Validação de Segurança (X-Hub-Signature-256)
     const signature = req.headers['x-hub-signature-256'];
-    if (APP_SECRET && signature && req.rawBody) {
-      const expectedSignature = 'sha256=' + crypto.createHmac('sha256', APP_SECRET).update(req.rawBody).digest('hex');
+    const { app_secret } = await getWhatsAppConfig();
+    
+    if (app_secret && signature && req.rawBody) {
+      const expectedSignature = 'sha256=' + crypto.createHmac('sha256', app_secret).update(req.rawBody).digest('hex');
       if (signature !== expectedSignature) {
         console.error('❌ Assinatura X-Hub-Signature-256 inválida! Bloqueando requisição.');
         return res.sendStatus(403);
@@ -487,16 +502,16 @@ app.get('/', (req, res) => {
 /**
  * GET /health - Status do servidor
  */
-app.get('/health', (req, res) => {
+app.get('/health', async (req, res) => {
+  const config = await getWhatsAppConfig();
   res.json({
     status: 'healthy',
     uptime: process.uptime(),
     memory: process.memoryUsage(),
     mongodb: mongoInitialized,
     environment: {
-      hasWebhookToken: !!VERIFY_TOKEN,
-      hasWhatsAppToken: !!WHATSAPP_TOKEN,
-      hasPhoneNumberId: !!PHONE_NUMBER_ID,
+      hasWebhookToken: !!config.verify_token,
+      hasAppSecret: !!config.app_secret,
       mongodbUri: MONGODB_URI,
       mongodbDbName: MONGODB_DB_NAME
     }
@@ -513,12 +528,11 @@ app.listen(PORT, () => {
   console.log('╚════════════════════════════════════════════════════════╝\n');
   console.log(`📡 Servidor rodando na porta: ${PORT}`);
   console.log(`🔗 URL do webhook: http://localhost:${PORT}/webhook`);
-  console.log(`🔐 Verify Token: ${VERIFY_TOKEN}`);
+  console.log(`🔐 App Secret (HMAC): ${FALLBACK_APP_SECRET ? '✅ Configurado no .env' : '❌ Não configurado (Dinâmico via DB?)'}`);
   console.log(`\n📋 Status da configuração:`);
   console.log(`   MongoDB: ${mongoInitialized ? '✅ Conectado' : '❌ Não configurado'}`);
   console.log(`   Redis: ${redisInitialized ? '✅ Conectado' : '❌ Não configurado'}`);
-  console.log(`   WhatsApp Token: ${WHATSAPP_TOKEN ? '✅ Configurado' : '❌ Não configurado'}`);
-  console.log(`   Phone Number ID: ${PHONE_NUMBER_ID ? '✅ Configurado' : '❌ Não configurado'}`);
+  console.log(`   WhatsApp Configs: Sendo buscadas dinamicamente via MongoDB (ou .env fallback)`);
   console.log(`\n💡 Dicas:`);
   console.log(`   - Para expor localmente: use ngrok (ngrok http ${PORT})`);
   console.log(`   - Configure o webhook URL na Meta: https://developers.facebook.com`);

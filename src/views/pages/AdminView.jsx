@@ -286,6 +286,16 @@ const AdminContent = ({ activeTab }) => {
     // Hooks globais do AdminContent (Mantidos no topo, como exige o React)
     const [status, setStatus] = useState('DISCONNECTED');
     const [isLoading, setIsLoading] = useState(false);
+    
+    // Configurações da Meta
+    const [whatsappConfig, setWhatsappConfig] = useState({
+      access_token: '',
+      phone_number_id: '',
+      waba_id: '',
+      app_secret: '',
+      fb_app_id: '',
+      fb_config_id: ''
+    });
 
     // Ajustes Gerais
     const [generalSettings, setGeneralSettings] = useState({
@@ -341,6 +351,7 @@ const AdminContent = ({ activeTab }) => {
     useEffect(() => {
         if (activeTab === 'connection') {
             SettingsService.getWhatsAppStatus().then(s => setStatus(s.state));
+            loadWhatsAppConfig();
         } else if (activeTab === 'general') {
             loadGeneralSettings();
         } else if (activeTab === 'quick') {
@@ -556,6 +567,31 @@ const AdminContent = ({ activeTab }) => {
         setShowReasonModal(true);
     };
 
+    const loadWhatsAppConfig = async () => {
+        const config = await SettingsService.getWhatsAppConfigDetails();
+        setWhatsappConfig({
+            access_token: config.access_token || '',
+            phone_number_id: config.phone_number_id || '',
+            waba_id: config.waba_id || '',
+            app_secret: config.app_secret || '',
+            fb_app_id: config.fb_app_id || '',
+            fb_config_id: config.fb_config_id || ''
+        });
+    };
+
+    const handleSaveWhatsAppConfig = async () => {
+        setIsLoading(true);
+        try {
+            await SettingsService.updateWhatsAppConfig(whatsappConfig);
+            alert('Configurações salvas com sucesso no banco de dados!');
+            handleConnect(); // Atualiza o status
+        } catch (error) {
+            alert('Erro ao salvar configurações.');
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
     const handleConnect = async () => {
         setIsLoading(true);
         try {
@@ -567,6 +603,78 @@ const AdminContent = ({ activeTab }) => {
         } finally {
             setIsLoading(false);
         }
+    };
+
+    // Facebook SDK for Embedded Signup
+    useEffect(() => {
+        const appId = whatsappConfig.fb_app_id || import.meta.env.VITE_FACEBOOK_APP_ID;
+        
+        if (activeTab === 'connection' && appId) {
+            // Se o SDK já estiver carregado, apenas reinicializamos
+            if (window.FB) {
+                window.FB.init({
+                    appId: appId,
+                    cookie: true,
+                    xfbml: true,
+                    version: 'v21.0'
+                });
+            } else {
+                // Se ainda não carregou, configuramos o callback e chamamos o script
+                window.fbAsyncInit = function () {
+                    window.FB.init({
+                        appId: appId,
+                        cookie: true,
+                        xfbml: true,
+                        version: 'v21.0'
+                    });
+                };
+
+                (function (d, s, id) {
+                    var js, fjs = d.getElementsByTagName(s)[0];
+                    if (d.getElementById(id)) { return; }
+                    js = d.createElement(s); js.id = id;
+                    js.src = "https://connect.facebook.net/en_US/sdk.js";
+                    fjs.parentNode.insertBefore(js, fjs);
+                }(document, 'script', 'facebook-jssdk'));
+            }
+        }
+    }, [activeTab, whatsappConfig.fb_app_id]);
+
+    const launchWhatsAppSignup = () => {
+        if (!whatsappConfig.fb_app_id) {
+            alert('Por favor, informe o Facebook App ID antes de iniciar o Embedded Signup.');
+            return;
+        }
+
+        window.FB.login(
+            (response) => {
+                if (response.authResponse) {
+                    const accessToken = response.authResponse.accessToken;
+                    console.log('Login com Facebook bem sucedido!', response);
+                    alert(`Login bem sucedido! Um novo token foi gerado. Atualizando campos...`);
+                    
+                    // Em um cenário real de Embedded Signup com Config ID, usaríamos o SDK 
+                    // de Business Management para pegar o WABA_ID e o PHONE_NUMBER_ID do client_extension.
+                    // Aqui salvamos o novo token provisório e mostramos ao usuário.
+                    setWhatsappConfig({
+                        ...whatsappConfig,
+                        access_token: accessToken
+                    });
+                } else {
+                    console.log('O usuário cancelou o login ou não o autorizou totalmente.');
+                }
+            },
+            {
+                config_id: whatsappConfig.fb_config_id, 
+                response_type: 'code', 
+                override_default_response_type: true, 
+                extras: {
+                    setup: {
+                        // Prefill data can go here
+                    }
+                }
+            }
+        );
     };
 
     // Filtros
@@ -619,27 +727,94 @@ const AdminContent = ({ activeTab }) => {
                     </div>
                 </div>
 
-                {status === 'CONNECTED' ? (
-                    <div className="text-center py-8">
-                        <div className="w-16 h-16 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto mb-4">
-                            <Wifi size={32} />
-                        </div>
-                        <h3 className="text-xl font-bold text-gray-800">Conexão Estabelecida</h3>
-                        <p className="text-gray-500 mt-2 mb-6">Sua instância está operando normalmente com a API Oficial.</p>
-                        <Button variant="danger" onClick={() => setStatus('DISCONNECTED')}>Desconectar</Button>
+                <div className="space-y-4 mb-6">
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Access Token (Permanent)</label>
+                        <input 
+                            type="password" 
+                            className="w-full p-2 border rounded-md focus:ring-blue-500 focus:border-blue-500" 
+                            value={whatsappConfig.access_token}
+                            onChange={(e) => setWhatsappConfig({...whatsappConfig, access_token: e.target.value})}
+                            placeholder="EAAL..."
+                        />
                     </div>
-                ) : (
-                    <div className="space-y-4">
-                        <div className="p-4 bg-blue-50 text-blue-800 text-sm rounded-lg border border-blue-100">
-                            Certifique-se de configurar suas credenciais (Phone ID, WABA ID, Token) no arquivo <code>src/config/whatsapp.js</code> antes de conectar.
-                        </div>
-                        <div className="flex justify-end">
-                            <Button onClick={handleConnect} disabled={isLoading} className="bg-emerald-600 text-white">
-                                {isLoading ? 'Verificando...' : 'Validar Conexão'}
-                            </Button>
-                        </div>
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Phone Number ID</label>
+                        <input 
+                            type="text" 
+                            className="w-full p-2 border rounded-md focus:ring-blue-500 focus:border-blue-500" 
+                            value={whatsappConfig.phone_number_id}
+                            onChange={(e) => setWhatsappConfig({...whatsappConfig, phone_number_id: e.target.value})}
+                            placeholder="Ex: 10423..."
+                        />
                     </div>
-                )}
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">WhatsApp Business Account ID (WABA ID)</label>
+                        <input 
+                            type="text" 
+                            className="w-full p-2 border rounded-md focus:ring-blue-500 focus:border-blue-500" 
+                            value={whatsappConfig.waba_id}
+                            onChange={(e) => setWhatsappConfig({...whatsappConfig, waba_id: e.target.value})}
+                            placeholder="Ex: 11254..."
+                        />
+                    </div>
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">App Secret (Para Webhook HMAC)</label>
+                        <input 
+                            type="password" 
+                            className="w-full p-2 border rounded-md focus:ring-blue-500 focus:border-blue-500" 
+                            value={whatsappConfig.app_secret}
+                            onChange={(e) => setWhatsappConfig({...whatsappConfig, app_secret: e.target.value})}
+                            placeholder="Ex: d41d8cd98f00b204e9800998ecf8427e"
+                        />
+                    </div>
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Facebook App ID (Obrigatório para Login)</label>
+                        <input 
+                            type="text" 
+                            className="w-full p-2 border rounded-md focus:ring-blue-500 focus:border-blue-500" 
+                            value={whatsappConfig.fb_app_id}
+                            onChange={(e) => setWhatsappConfig({...whatsappConfig, fb_app_id: e.target.value})}
+                            placeholder="Ex: 1234567890123"
+                        />
+                    </div>
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Facebook Config ID (Opcional - Fluxo Direto)</label>
+                        <input 
+                            type="text" 
+                            className="w-full p-2 border rounded-md focus:ring-blue-500 focus:border-blue-500" 
+                            value={whatsappConfig.fb_config_id}
+                            onChange={(e) => setWhatsappConfig({...whatsappConfig, fb_config_id: e.target.value})}
+                            placeholder="Ex: 987654321"
+                        />
+                    </div>
+                </div>
+
+                <div className="flex flex-col gap-4 pt-4 border-t border-gray-100">
+                    <div className="flex justify-between items-center">
+                        <div>
+                            <h4 className="font-bold text-gray-800">Autenticação Simplificada</h4>
+                            <p className="text-sm text-gray-500">Conecte sua conta do WhatsApp automaticamente.</p>
+                        </div>
+                        <Button 
+                            onClick={launchWhatsAppSignup} 
+                            disabled={!whatsappConfig.fb_app_id}
+                            className={`flex items-center gap-2 text-white ${whatsappConfig.fb_app_id ? 'bg-blue-600 hover:bg-blue-700' : 'bg-blue-300 cursor-not-allowed'}`}
+                        >
+                            <Facebook size={18} />
+                            Conectar com Facebook
+                        </Button>
+                    </div>
+                    
+                    <div className="flex justify-end gap-3 mt-4">
+                        <Button onClick={handleConnect} disabled={isLoading} variant="outline">
+                            {isLoading ? 'Verificando...' : 'Testar Conexão'}
+                        </Button>
+                        <Button onClick={handleSaveWhatsAppConfig} disabled={isLoading} className="bg-emerald-600 text-white">
+                            Salvar Configurações
+                        </Button>
+                    </div>
+                </div>
              </div>
           </div>
         );

@@ -22,6 +22,32 @@ export const SettingsService = {
     }
   },
 
+  async getWhatsAppConfigDetails() {
+    try {
+      const response = await fetch(`${API_URL}/settings/whatsapp`);
+      if (!response.ok) throw new Error('Erro ao buscar detalhes da configuração');
+      return await response.json();
+    } catch (error) {
+      console.error('Error fetching config:', error);
+      return {};
+    }
+  },
+
+  async updateWhatsAppConfig(config) {
+    try {
+      const response = await fetch(`${API_URL}/settings/whatsapp`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(config)
+      });
+      if (!response.ok) throw new Error('Erro ao salvar configurações do WhatsApp');
+      return await response.json();
+    } catch (error) {
+      console.error('Error updating WhatsApp config:', error);
+      throw error;
+    }
+  },
+
   // ==========================================
   // GENERAL SETTINGS
   // ==========================================
